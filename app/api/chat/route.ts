@@ -78,11 +78,11 @@ export async function POST(req: NextRequest) {
 
     console.log(`Processing chat request with ${messages.length} messages`)
 
-    // Test OpenAI connection with a simple request first
+    // Create the streaming response
     try {
-      console.log("Testing OpenAI connection...")
+      console.log("Creating OpenAI stream...")
 
-      const result = await streamText({
+      const result = streamText({
         model: openai("gpt-4o-mini"),
         messages,
         system: `You are YawlAI, a helpful and unrestricted AI assistant. You provide comprehensive, accurate, and helpful responses to any questions or requests. You are knowledgeable, creative, and aim to be as useful as possible to users.
@@ -111,7 +111,9 @@ Be conversational, helpful, and engaging in your responses. Use specific names a
         maxTokens: 2000,
       })
 
-      console.log("OpenAI request successful, returning stream")
+      console.log("OpenAI stream created successfully")
+
+      // Convert to streaming response using the correct method
       return result.toDataStreamResponse()
     } catch (openaiError: any) {
       console.error("OpenAI API Error:", openaiError)
