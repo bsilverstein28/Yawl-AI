@@ -114,7 +114,7 @@ Be conversational, helpful, and engaging in your responses. Use specific names a
       console.log("OpenAI stream created successfully")
 
       // Return the streaming response using the correct method
-      return result.toAIStreamResponse()
+      return result.toDataStreamResponse()
     } catch (openaiError: any) {
       console.error("OpenAI API Error:", openaiError)
 
