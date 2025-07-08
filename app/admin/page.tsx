@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Upload, Plus, Trash2, Download, ArrowLeft, FileSpreadsheet, CheckCircle, AlertCircle } from "lucide-react"
+import { Upload, Plus, Trash2, Download, ArrowLeft, FileSpreadsheet, CheckCircle, AlertCircle, Bug } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import type { Keyword } from "@/lib/database.types"
@@ -226,24 +226,65 @@ export default function AdminPage() {
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage advertising keywords and URLs</p>
 
-          {/* Brand CSV Upload Card */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileSpreadsheet className="w-5 h-5 mr-2" />
-                Brand CSV Upload
-              </CardTitle>
-              <CardDescription>Process the 100-brand CSV file and upload all keywords at once</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/admin/brand-upload">
-                <Button className="w-full">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Process Brand CSV File
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            {/* Brand CSV Upload Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <FileSpreadsheet className="w-5 h-5 mr-2" />
+                  Brand CSV Upload
+                </CardTitle>
+                <CardDescription>Process the 100-brand CSV file</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/admin/brand-upload">
+                  <Button className="w-full">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Process Brand CSV
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Keyword Debugger Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <Bug className="w-5 h-5 mr-2" />
+                  Keyword Debugger
+                </CardTitle>
+                <CardDescription>Test and debug keyword matching</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/admin/debug-keywords">
+                  <Button className="w-full bg-transparent" variant="outline">
+                    <Bug className="w-4 h-4 mr-2" />
+                    Debug Keywords
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* API Diagnostics Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <AlertCircle className="w-5 h-5 mr-2" />
+                  API Diagnostics
+                </CardTitle>
+                <CardDescription>Test OpenAI API configuration</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/admin/api-diagnostics">
+                  <Button className="w-full bg-transparent" variant="outline">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    Test API
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

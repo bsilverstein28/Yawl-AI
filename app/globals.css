@@ -58,11 +58,28 @@
   }
 }
 
-/* Custom styles for ad links */
+/* Enhanced styles for ad links */
 .ad-link {
   @apply text-blue-600 hover:text-blue-800 underline font-medium transition-colors;
+  background-color: rgba(59, 130, 246, 0.1);
+  padding: 1px 3px;
+  border-radius: 3px;
+  text-decoration: underline;
+  text-decoration-color: rgba(59, 130, 246, 0.5);
+}
+
+.ad-link:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+  text-decoration-color: rgba(59, 130, 246, 0.8);
 }
 
 .dark .ad-link {
   @apply text-blue-400 hover:text-blue-300;
+  background-color: rgba(96, 165, 250, 0.1);
+  text-decoration-color: rgba(96, 165, 250, 0.5);
+}
+
+.dark .ad-link:hover {
+  background-color: rgba(96, 165, 250, 0.2);
+  text-decoration-color: rgba(96, 165, 250, 0.8);
 }
