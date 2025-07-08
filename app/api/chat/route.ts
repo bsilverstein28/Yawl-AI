@@ -112,7 +112,7 @@ Be conversational, helpful, and engaging in your responses. Use specific names a
       })
 
       console.log("OpenAI request successful, returning stream")
-      return result.toAIStreamResponse()
+      return result.toDataStreamResponse()
     } catch (openaiError: any) {
       console.error("OpenAI API Error:", openaiError)
 
