@@ -83,3 +83,90 @@
   background-color: rgba(96, 165, 250, 0.2);
   text-decoration-color: rgba(96, 165, 250, 0.8);
 }
+
+/* Modern prose styling for chat messages */
+.prose-custom {
+  @apply max-w-none;
+}
+
+.prose-custom h1 {
+  @apply text-2xl font-bold text-gray-900 mt-8 mb-6 leading-tight;
+}
+
+.prose-custom h2 {
+  @apply text-xl font-bold text-gray-900 mt-8 mb-4 pb-2 border-b border-gray-200 leading-tight;
+}
+
+.prose-custom h3 {
+  @apply text-lg font-semibold text-gray-900 mt-6 mb-3 border-l-4 border-blue-500 pl-4 leading-tight;
+}
+
+.prose-custom p {
+  @apply mb-4 text-gray-800 leading-relaxed;
+}
+
+.prose-custom strong {
+  @apply font-semibold text-gray-900;
+}
+
+.prose-custom em {
+  @apply italic text-gray-700;
+}
+
+.prose-custom code {
+  @apply bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-mono border;
+}
+
+.prose-custom pre {
+  @apply bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed my-4;
+}
+
+.prose-custom pre code {
+  @apply bg-transparent border-0 p-0 text-gray-800;
+}
+
+/* Modern list styling */
+.prose-custom ul {
+  @apply space-y-2 my-4 ml-0;
+}
+
+.prose-custom ol {
+  @apply space-y-2 my-4 ml-0;
+}
+
+.prose-custom li {
+  @apply text-gray-800 leading-relaxed;
+}
+
+/* Custom counter for ordered lists */
+.counter-reset-list {
+  counter-reset: list-counter;
+}
+
+.counter-reset-list li {
+  counter-increment: list-counter;
+}
+
+/* Smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better focus states */
+.focus-visible\:ring-2:focus-visible {
+  @apply ring-2 ring-blue-500 ring-offset-2;
+}
+
+/* Improved button hover states */
+.hover\:bg-gray-100:hover {
+  @apply bg-gray-100 transition-colors duration-150;
+}
+
+.hover\:bg-gray-200:hover {
+  @apply bg-gray-200 transition-colors duration-150;
+}
+
+/* Better shadow transitions */
+.focus-within\:shadow-md:focus-within {
+  @apply shadow-md transition-shadow duration-200;
+}

@@ -8,25 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-  Send,
-  Bot,
-  User,
-  Settings,
-  Paperclip,
-  X,
-  FileText,
-  ImageIcon,
-  AlertCircle,
-  TestTube,
-  RefreshCw,
-} from "lucide-react"
+import { Send, Bot, User, Settings, Paperclip, X, FileText, ImageIcon, AlertCircle, Plus } from "lucide-react"
 import Link from "next/link"
-import { processMessageWithAds, testKeywordMatching, clearKeywordCache } from "@/lib/ad-processor"
+import Image from "next/image"
+import { processMessageWithAds } from "@/lib/ad-processor"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ChatPage() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, append, error } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, append, error, setInput } = useChat({
     api: "/api/chat",
     onError: (error) => {
       console.error("Chat error:", error)
@@ -58,6 +47,16 @@ export default function ChatPage() {
   const [sessionId] = useState(() => Math.random().toString(36).substring(7))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+
+  const startNewChat = () => {
+    // Clear all messages and reset the chat
+    setProcessedMessages([])
+    setUploadedFiles([])
+    setInput("")
+
+    // Reset the useChat hook by reloading the page or using a more elegant solution
+    window.location.reload()
+  }
 
   // Process messages with ad links when they update
   React.useEffect(() => {
@@ -99,93 +98,6 @@ export default function ChatPage() {
 
     processMessages()
   }, [messages, sessionId, toast])
-
-  // Test keyword matching function
-  const testKeywords = async () => {
-    const testMessage =
-      "I love Nike shoes and Apple products. Tesla cars are amazing, and I use Amazon for shopping. Microsoft Office is great for work."
-
-    console.log("=== STARTING KEYWORD TEST ===")
-    await testKeywordMatching(testMessage)
-
-    // Also test the actual processing
-    console.log("=== TESTING ACTUAL PROCESSING ===")
-    const processed = await processMessageWithAds(testMessage)
-    console.log("Processed result:", processed)
-
-    toast({
-      title: "Keyword Test Complete",
-      description: "Check the browser console for detailed results.",
-    })
-  }
-
-  // Clear cache and reprocess
-  const refreshKeywords = async () => {
-    clearKeywordCache()
-
-    // Reprocess current messages
-    if (messages.length > 0) {
-      setProcessingAds(true)
-      try {
-        const processed = await Promise.all(
-          messages.map(async (message) => {
-            if (message.role === "assistant") {
-              const processedContent = await processMessageWithAds(message.content, sessionId)
-              return { ...message, content: processedContent }
-            }
-            return message
-          }),
-        )
-        setProcessedMessages(processed)
-        toast({
-          title: "Keywords Refreshed",
-          description: "Keyword cache cleared and messages reprocessed.",
-        })
-      } catch (error) {
-        console.error("Error refreshing keywords:", error)
-        toast({
-          title: "Refresh Failed",
-          description: "Failed to refresh keywords.",
-          variant: "destructive",
-        })
-      } finally {
-        setProcessingAds(false)
-      }
-    } else {
-      toast({
-        title: "Keywords Refreshed",
-        description: "Keyword cache cleared.",
-      })
-    }
-  }
-
-  // Enhanced API connection test
-  const testAPIConnection = async () => {
-    try {
-      // First test the diagnostic endpoint
-      const diagnosticResponse = await fetch("/api/test-openai")
-      const diagnosticData = await diagnosticResponse.json()
-
-      if (diagnosticData.success) {
-        toast({
-          title: "API Connection Test",
-          description: `OpenAI API is working! Response: ${diagnosticData.response}`,
-        })
-      } else {
-        toast({
-          title: "API Configuration Issue",
-          description: `${diagnosticData.error}. Check the admin diagnostics page for details.`,
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "API Test Failed",
-        description: error instanceof Error ? error.message : "Network error",
-        variant: "destructive",
-      })
-    }
-  }
 
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -316,52 +228,131 @@ export default function ChatPage() {
       content: messageContent,
     })
 
-    // Clear files after sending
+    // Clear the input field and uploaded files after sending
+    setInput("")
     setUploadedFiles([])
   }
 
-  // Function to format message content with proper markdown-like formatting
+  // Enhanced function to format message content with modern typography
   const formatMessageContent = (content: string) => {
     let formatted = content
 
-    // Convert **bold** to <strong>
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    // Convert headings with proper hierarchy and modern styling
+    formatted = formatted.replace(
+      /^### (.*$)/gm,
+      '<h3 class="text-lg font-semibold text-gray-900 mt-6 mb-3 border-l-4 border-blue-500 pl-4">$1</h3>',
+    )
+    formatted = formatted.replace(
+      /^## (.*$)/gm,
+      '<h2 class="text-xl font-bold text-gray-900 mt-8 mb-4 pb-2 border-b border-gray-200">$1</h2>',
+    )
+    formatted = formatted.replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold text-gray-900 mt-8 mb-6">$1</h1>')
 
-    // Convert *italic* to <em>
-    formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>")
+    // Convert **bold** to modern strong styling
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
 
-    // Convert code blocks
+    // Convert *italic* to modern em styling
+    formatted = formatted.replace(/\*(.*?)\*/g, '<em class="italic text-gray-700">$1</em>')
+
+    // Convert code blocks with modern styling
     formatted = formatted.replace(
       /```([\s\S]*?)```/g,
-      '<pre class="bg-gray-100 p-3 rounded-md my-3 overflow-x-auto"><code>$1</code></pre>',
+      '<div class="my-4"><pre class="bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed"><code class="text-gray-800">$1</code></pre></div>',
     )
 
-    // Convert inline code
-    formatted = formatted.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm">$1</code>')
+    // Convert inline code with modern styling
+    formatted = formatted.replace(
+      /`([^`]+)`/g,
+      '<code class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-mono border">$1</code>',
+    )
 
-    // Convert bullet points (- or *) to proper HTML lists
-    formatted = formatted.replace(/^[\s]*[-*]\s+(.+)$/gm, "<li>$1</li>")
+    // Handle nested lists - first convert all list items
+    // Convert main bullet points (- or * at start of line)
+    formatted = formatted.replace(/^[\s]*[-*]\s+(.+)$/gm, '<li class="main-bullet">$1</li>')
 
-    // Wrap consecutive <li> elements in <ul>
-    formatted = formatted.replace(/(<li>.*<\/li>)/gs, (match) => {
-      return `<ul class="list-disc list-inside space-y-1 my-3">${match}</ul>`
-    })
+    // Convert sub bullet points (  - or   * with indentation)
+    formatted = formatted.replace(/^[\s]{2,}[-*]\s+(.+)$/gm, '<li class="sub-bullet">$1</li>')
 
-    // Convert numbered lists (1. 2. etc.) to ordered lists
-    formatted = formatted.replace(/^[\s]*\d+\.\s+(.+)$/gm, "<li>$1</li>")
-    formatted = formatted.replace(/(<li>.*<\/li>)/gs, (match) => {
-      if (!match.includes("list-disc")) {
-        return `<ol class="list-decimal list-inside space-y-1 my-3">${match}</ol>`
-      }
-      return match
-    })
+    // Convert numbered lists
+    formatted = formatted.replace(/^[\s]*(\d+)\.\s+(.+)$/gm, '<li class="numbered-item" data-number="$1">$2</li>')
 
-    // Convert line breaks to proper paragraphs
-    formatted = formatted.replace(/\n\n/g, '</p><p class="mb-4">')
-    formatted = `<p class="mb-4">${formatted}</p>`
+    // Group consecutive list items into proper lists
+    // Handle main bullet lists
+    formatted = formatted.replace(
+      /(<li class="main-bullet">.*?<\/li>(?:\s*<li class="(?:main-bullet|sub-bullet)">.*?<\/li>)*)/gs,
+      (match) => {
+        // Split into main and sub items
+        const items = match
+          .split("</li>")
+          .filter((item) => item.trim())
+          .map((item) => item + "</li>")
+        let result = '<ul class="space-y-2 my-4 ml-0">'
 
-    // Clean up empty paragraphs
-    formatted = formatted.replace(/<p class="mb-4"><\/p>/g, "")
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          if (item.includes('class="main-bullet"')) {
+            const content = item.replace('<li class="main-bullet">', "").replace("</li>", "")
+            result += `<li class="flex items-start space-x-3"><div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div><div class="flex-1 text-gray-800 leading-relaxed">${content}</div></li>`
+
+            // Check for sub-bullets that follow
+            const subItems = []
+            while (i + 1 < items.length && items[i + 1].includes('class="sub-bullet"')) {
+              i++
+              const subContent = items[i].replace('<li class="sub-bullet">', "").replace("</li>", "")
+              subItems.push(subContent)
+            }
+
+            if (subItems.length > 0) {
+              result += '<li><ul class="space-y-1 mt-2 ml-5">'
+              subItems.forEach((subItem) => {
+                result += `<li class="flex items-start space-x-2"><div class="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2 flex-shrink-0"></div><div class="flex-1 text-gray-700 text-sm leading-relaxed">${subItem}</div></li>`
+              })
+              result += "</ul></li>"
+            }
+          }
+        }
+        result += "</ul>"
+        return result
+      },
+    )
+
+    // Handle numbered lists
+    formatted = formatted.replace(
+      /(<li class="numbered-item".*?<\/li>(?:\s*<li class="numbered-item".*?<\/li>)*)/gs,
+      (match) => {
+        const items = match
+          .split("</li>")
+          .filter((item) => item.trim())
+          .map((item) => item + "</li>")
+        let result = '<ol class="space-y-2 my-4 ml-0 counter-reset-list">'
+
+        items.forEach((item) => {
+          const numberMatch = item.match(/data-number="(\d+)"/)
+          const number = numberMatch ? numberMatch[1] : "1"
+          const content = item.replace(/<li class="numbered-item".*?>/, "").replace("</li>", "")
+          result += `<li class="flex items-start space-x-3"><div class="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0">${number}</div><div class="flex-1 text-gray-800 leading-relaxed">${content}</div></li>`
+        })
+
+        result += "</ol>"
+        return result
+      },
+    )
+
+    // Clean up any remaining list markup
+    formatted = formatted.replace(/<li class="(main-bullet|sub-bullet|numbered-item)"[^>]*>/g, "")
+    formatted = formatted.replace(/<\/li>/g, "")
+
+    // Convert line breaks to proper paragraphs with modern spacing
+    formatted = formatted.replace(/\n\n/g, '</p><p class="mb-4 text-gray-800 leading-relaxed">')
+    formatted = `<div class="prose-custom"><p class="mb-4 text-gray-800 leading-relaxed">${formatted}</p></div>`
+
+    // Clean up empty paragraphs and extra spacing
+    formatted = formatted.replace(/<p class="mb-4 text-gray-800 leading-relaxed"><\/p>/g, "")
+    formatted = formatted.replace(/<p class="mb-4 text-gray-800 leading-relaxed">\s*<\/p>/g, "")
+
+    // Fix spacing around headings and lists
+    formatted = formatted.replace(/(<\/(?:h1|h2|h3)>)\s*<p class="mb-4 text-gray-800 leading-relaxed">/g, "$1")
+    formatted = formatted.replace(/(<\/(?:ul|ol)>)\s*<p class="mb-4 text-gray-800 leading-relaxed">/g, "$1")
 
     return formatted
   }
@@ -375,12 +366,18 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen bg-white">
-      {/* Header */}
+      {/* Header - Updated with new logo */}
       <header className="border-b bg-white sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Bot className="w-5 h-5 text-white" />
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 flex items-center justify-center">
+              <Image
+                src="/yawlai-logo.png"
+                alt="YawlAI Logo"
+                width={40}
+                height={40}
+                className="w-full h-full object-contain"
+              />
             </div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               YawlAI
@@ -388,17 +385,9 @@ export default function ChatPage() {
             {processingAds && <div className="text-xs text-blue-600 animate-pulse">Processing ads...</div>}
           </div>
           <div className="flex items-center space-x-2">
-            <Button onClick={testKeywords} variant="outline" size="sm">
-              <TestTube className="w-4 h-4 mr-2" />
-              Test Keywords
-            </Button>
-            <Button onClick={refreshKeywords} variant="outline" size="sm" disabled={processingAds}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${processingAds ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-            <Button onClick={testAPIConnection} variant="outline" size="sm">
-              <AlertCircle className="w-4 h-4 mr-2" />
-              Test API
+            <Button onClick={startNewChat} variant="outline" size="sm" className="bg-transparent">
+              <Plus className="w-4 h-4 mr-2" />
+              New Chat
             </Button>
             <Link href="/admin">
               <Button variant="outline" size="sm">
@@ -425,9 +414,6 @@ export default function ChatPage() {
                     Check API Configuration
                   </Button>
                 </Link>
-                <Button size="sm" variant="outline" className="text-xs bg-transparent" onClick={testAPIConnection}>
-                  Test Connection
-                </Button>
               </div>
             </div>
           </div>
@@ -436,19 +422,20 @@ export default function ChatPage() {
 
       {/* Chat Messages */}
       <ScrollArea className="flex-1">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {processedMessages.length === 0 && (
             <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-              <Bot className="w-16 h-16 mb-6 text-blue-500" />
-              <h2 className="text-2xl font-semibold mb-3 text-gray-800">Welcome to YawlAI</h2>
-              <p className="text-gray-600 text-center max-w-md">
-                Your unrestricted AI assistant. Ask me anything or upload documents for analysis!
-              </p>
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Try asking about:</strong> Nike, Apple, Tesla, Amazon, or any brands you've uploaded!
-                </p>
+              <div className="w-20 h-20 mb-6 flex items-center justify-center">
+                <Image
+                  src="/yawlai-logo.png"
+                  alt="YawlAI Logo"
+                  width={80}
+                  height={80}
+                  className="w-full h-full object-contain"
+                />
               </div>
+              <h2 className="text-2xl font-semibold mb-3 text-gray-800">Welcome to YawlAI</h2>
+              <p className="text-gray-600 text-center max-w-md">Set Sail with YawlAI, Your Free AI Assistant</p>
             </div>
           )}
 
@@ -456,12 +443,12 @@ export default function ChatPage() {
             <div
               key={message.id}
               className={`w-full ${
-                message.role === "user" ? "bg-gray-50" : "bg-white"
+                message.role === "user" ? "bg-gray-50/50" : "bg-white"
               } border-b border-gray-100 last:border-b-0`}
             >
-              <div className="max-w-3xl mx-auto px-4 py-6">
+              <div className="max-w-4xl mx-auto px-6 py-8">
                 <div className="flex items-start space-x-4">
-                  <Avatar className="w-8 h-8 flex-shrink-0">
+                  <Avatar className="w-9 h-9 flex-shrink-0">
                     <AvatarFallback
                       className={message.role === "user" ? "bg-gray-600 text-white" : "bg-blue-500 text-white"}
                     >
@@ -470,15 +457,18 @@ export default function ChatPage() {
                   </Avatar>
 
                   <div className="flex-1 min-w-0">
-                    <div className="mb-1">
+                    <div className="mb-2">
                       <span className="text-sm font-medium text-gray-900">
                         {message.role === "user" ? "You" : "YawlAI"}
                       </span>
                     </div>
                     <div
-                      className="text-gray-800 leading-relaxed"
+                      className="text-gray-800 leading-relaxed max-w-none"
                       dangerouslySetInnerHTML={{
-                        __html: message.role === "assistant" ? formatMessageContent(message.content) : message.content,
+                        __html:
+                          message.role === "assistant"
+                            ? formatMessageContent(message.content)
+                            : `<p class="text-gray-800 leading-relaxed whitespace-pre-wrap">${message.content}</p>`,
                       }}
                     />
                   </div>
@@ -489,15 +479,15 @@ export default function ChatPage() {
 
           {isLoading && (
             <div className="w-full bg-white border-b border-gray-100">
-              <div className="max-w-3xl mx-auto px-4 py-6">
+              <div className="max-w-4xl mx-auto px-6 py-8">
                 <div className="flex items-start space-x-4">
-                  <Avatar className="w-8 h-8 flex-shrink-0">
+                  <Avatar className="w-9 h-9 flex-shrink-0">
                     <AvatarFallback className="bg-blue-500 text-white">
                       <Bot className="w-4 h-4" />
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <div className="mb-1">
+                    <div className="mb-2">
                       <span className="text-sm font-medium text-gray-900">YawlAI</span>
                     </div>
                     <div className="flex space-x-1">
@@ -521,7 +511,7 @@ export default function ChatPage() {
 
       {/* Input Form - Bottom Center */}
       <div className="border-t bg-white p-4 mb-4">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {/* Uploaded Files Display */}
           {uploadedFiles.length > 0 && (
             <div className="mb-3 p-3 bg-gray-50 rounded-lg">

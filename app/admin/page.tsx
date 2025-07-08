@@ -10,11 +10,24 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Upload, Plus, Trash2, Download, ArrowLeft, FileSpreadsheet, CheckCircle, AlertCircle, Bug } from "lucide-react"
+import {
+  Upload,
+  Plus,
+  Trash2,
+  Download,
+  ArrowLeft,
+  FileSpreadsheet,
+  CheckCircle,
+  AlertCircle,
+  Bug,
+  TestTube,
+  RefreshCw,
+} from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import type { Keyword } from "@/lib/database.types"
 import { handleFileUpload, generateTemplate, type KeywordUpload } from "@/lib/file-upload"
+import { testKeywordMatching, clearKeywordCache } from "@/lib/ad-processor"
 
 export default function AdminPage() {
   const [keywords, setKeywords] = useState<Keyword[]>([])
@@ -23,6 +36,7 @@ export default function AdminPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [newKeyword, setNewKeyword] = useState("")
   const [newUrl, setNewUrl] = useState("")
+  const [processingAds, setProcessingAds] = useState(false)
   const { toast } = useToast()
 
   // Fetch keywords from database
@@ -44,6 +58,63 @@ export default function AdminPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Test keyword matching function
+  const testKeywords = async () => {
+    const testMessage =
+      "I love Nike shoes and Apple products. Tesla cars are amazing, and I use Amazon for shopping. Microsoft Office is great for work."
+
+    console.log("=== STARTING KEYWORD TEST ===")
+    await testKeywordMatching(testMessage)
+
+    toast({
+      title: "Keyword Test Complete",
+      description: "Check the browser console for detailed results.",
+    })
+  }
+
+  // Clear cache and refresh
+  const refreshKeywords = async () => {
+    setProcessingAds(true)
+    clearKeywordCache()
+
+    // Refresh the keywords list
+    await fetchKeywords()
+
+    setProcessingAds(false)
+    toast({
+      title: "Keywords Refreshed",
+      description: "Keyword cache cleared and list refreshed.",
+    })
+  }
+
+  // Enhanced API connection test
+  const testAPIConnection = async () => {
+    try {
+      // First test the diagnostic endpoint
+      const diagnosticResponse = await fetch("/api/test-openai")
+      const diagnosticData = await diagnosticResponse.json()
+
+      if (diagnosticData.success) {
+        toast({
+          title: "API Connection Test",
+          description: `OpenAI API is working! Response: ${diagnosticData.response}`,
+        })
+      } else {
+        toast({
+          title: "API Configuration Issue",
+          description: `${diagnosticData.error}. Check the admin diagnostics page for details.`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "API Test Failed",
+        description: error instanceof Error ? error.message : "Network error",
+        variant: "destructive",
+      })
     }
   }
 
@@ -225,6 +296,28 @@ export default function AdminPage() {
           </Link>
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage advertising keywords and URLs</p>
+
+          {/* Debug Tools Section */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-lg font-semibold mb-3 text-blue-800">Debug & Testing Tools</h3>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={testKeywords} variant="outline" size="sm">
+                <TestTube className="w-4 h-4 mr-2" />
+                Test Keywords
+              </Button>
+              <Button onClick={refreshKeywords} variant="outline" size="sm" disabled={processingAds}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${processingAds ? "animate-spin" : ""}`} />
+                Refresh Cache
+              </Button>
+              <Button onClick={testAPIConnection} variant="outline" size="sm">
+                <AlertCircle className="w-4 h-4 mr-2" />
+                Test API
+              </Button>
+            </div>
+            <p className="text-sm text-blue-700 mt-2">
+              Use these tools to test keyword matching, refresh the cache, and verify API connectivity.
+            </p>
+          </div>
 
           {/* Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
