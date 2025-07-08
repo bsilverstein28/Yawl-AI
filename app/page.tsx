@@ -14,6 +14,13 @@ import Image from "next/image"
 import { processMessageWithAds } from "@/lib/ad-processor"
 import { useToast } from "@/hooks/use-toast"
 
+// Global function to track keyword clicks
+declare global {
+  interface Window {
+    trackKeywordClick: (keyword: string, targetUrl: string, userSession: string) => void
+  }
+}
+
 export default function ChatPage() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, append, error, setInput } = useChat({
     api: "/api/chat",
@@ -47,6 +54,54 @@ export default function ChatPage() {
   const [sessionId] = useState(() => Math.random().toString(36).substring(7))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+
+  // Track chat questions/prompts
+  const trackChatQuestion = async (question: string) => {
+    try {
+      await fetch("/api/track-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          user_session: sessionId,
+          query_text: question,
+          has_files: uploadedFiles.length > 0,
+          file_count: uploadedFiles.length,
+        }),
+      })
+      console.log("📊 Tracked chat question")
+    } catch (error) {
+      console.error("Error tracking chat question:", error)
+    }
+  }
+
+  // Set up global click tracking function
+  React.useEffect(() => {
+    window.trackKeywordClick = async (keyword: string, targetUrl: string, userSession: string) => {
+      try {
+        console.log(`🖱️ Tracking click for keyword: ${keyword}`)
+
+        await fetch("/api/track-click", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            keyword,
+            target_url: targetUrl,
+            user_session: userSession,
+          }),
+        })
+
+        console.log(`✅ Click tracked for keyword: ${keyword}`)
+      } catch (error) {
+        console.error("Error tracking keyword click:", error)
+      }
+    }
+
+    return () => {
+      // Cleanup
+      delete window.trackKeywordClick
+    }
+  }, [])
 
   const startNewChat = () => {
     // Clear all messages and reset the chat
@@ -178,6 +233,9 @@ export default function ChatPage() {
     if (!input.trim() && uploadedFiles.length === 0) return
 
     let messageContent = input
+
+    // Track the chat question
+    await trackChatQuestion(input)
 
     // Process uploaded files
     if (uploadedFiles.length > 0) {

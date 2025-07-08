@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Search, Eye, TrendingUp, DollarSign, Zap, MessageSquare } from "lucide-react"
+import { ArrowLeft, Search, Eye, TrendingUp, DollarSign, MessageSquare, MousePointer } from "lucide-react"
 import Link from "next/link"
 
 export default function DashboardPage() {
@@ -84,7 +84,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Searches</CardTitle>
+              <CardTitle className="text-sm font-medium">Chat Questions</CardTitle>
               <Search className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -95,25 +95,23 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Tokens</CardTitle>
-              <Zap className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Keywords Shown</CardTitle>
+              <Eye className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totals.total_tokens.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                {totals.input_tokens.toLocaleString()} in, {totals.output_tokens.toLocaleString()} out
-              </p>
+              <div className="text-2xl font-bold">{totals.impressions.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Keyword links displayed</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Keyword Impressions</CardTitle>
-              <Eye className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Keyword Clicks</CardTitle>
+              <MousePointer className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totals.impressions.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Sponsored links shown</p>
+              <div className="text-2xl font-bold">{totals.clicks.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Times keywords were clicked</p>
             </CardContent>
           </Card>
 
@@ -124,38 +122,38 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totals.ctr}%</div>
-              <p className="text-xs text-muted-foreground">
-                {totals.clicks} clicks / {totals.impressions} impressions
-              </p>
+              <p className="text-xs text-muted-foreground">Click-through rate</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Token Usage Stats */}
+        {/* Detailed Analytics */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <MessageSquare className="w-5 h-5 mr-2" />
-                Token Usage Breakdown
+                Daily Activity Summary
               </CardTitle>
-              <CardDescription>Input vs Output token consumption</CardDescription>
+              <CardDescription>Overview of daily chat and keyword activity</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Input Tokens</span>
-                  <span className="text-lg font-bold text-blue-600">{totals.input_tokens.toLocaleString()}</span>
+                  <span className="text-sm font-medium">Total Chat Questions</span>
+                  <span className="text-lg font-bold text-blue-600">{totals.searches.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Output Tokens</span>
-                  <span className="text-lg font-bold text-green-600">{totals.output_tokens.toLocaleString()}</span>
+                  <span className="text-sm font-medium">Keywords Displayed</span>
+                  <span className="text-lg font-bold text-green-600">{totals.impressions.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Keywords Clicked</span>
+                  <span className="text-lg font-bold text-purple-600">{totals.clicks.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t">
-                  <span className="text-sm font-medium">Average per Search</span>
-                  <span className="text-lg font-bold">
-                    {totals.searches > 0 ? Math.round(totals.total_tokens / totals.searches) : 0}
-                  </span>
+                  <span className="text-sm font-medium">Average CTR</span>
+                  <span className="text-lg font-bold">{totals.ctr}%</span>
                 </div>
               </div>
             </CardContent>
@@ -209,7 +207,7 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {topKeywords.map((keyword, index) => (
+                  {topKeywords.map((keyword: any, index: number) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{keyword.keyword}</TableCell>
                       <TableCell>{keyword.impressions.toLocaleString()}</TableCell>
@@ -231,7 +229,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4 max-h-96 overflow-y-auto">
-                {formattedRecentActivity.map((activity, index) => (
+                {formattedRecentActivity.map((activity: any, index: number) => (
                   <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <Badge
@@ -263,7 +261,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Top Token Usage Sessions */}
-        {topTokenSessions.length > 0 && (
+        {topTokenSessions && topTokenSessions.length > 0 && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>Top Token Usage by Chat Session</CardTitle>
@@ -281,7 +279,7 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {topTokenSessions.map((session: any, index) => (
+                  {topTokenSessions.map((session: any, index: number) => (
                     <TableRow key={index}>
                       <TableCell className="font-mono text-sm">{session.session_id.substring(0, 8)}...</TableCell>
                       <TableCell>{session.input_tokens.toLocaleString()}</TableCell>

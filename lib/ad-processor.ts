@@ -63,6 +63,23 @@ async function getActiveKeywords() {
   }
 }
 
+// Track keyword impression
+async function trackKeywordImpression(keyword: string, userSession?: string) {
+  try {
+    await fetch("/api/track-impression", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        keyword,
+        user_session: userSession,
+      }),
+    })
+    console.log(`📊 Tracked impression for keyword: ${keyword}`)
+  } catch (error) {
+    console.error("Error tracking impression:", error)
+  }
+}
+
 export async function processMessageWithAds(content: string, userSession?: string): Promise<string> {
   try {
     console.log("🚀 === STARTING AD PROCESSING ===")
@@ -125,8 +142,11 @@ export async function processMessageWithAds(content: string, userSession?: strin
           console.log(logEntry)
           processingLog.push(logEntry)
 
+          // Track impression for this keyword
+          await trackKeywordImpression(keywordText, userSession)
+
           // Replace with link - use a more specific replacement to avoid double-linking
-          const linkHtml = `<a href="${keyword.target_url}" target="_blank" rel="noopener noreferrer" class="ad-link" data-keyword="${keywordText}">$1</a>`
+          const linkHtml = `<a href="${keyword.target_url}" target="_blank" rel="noopener noreferrer" class="ad-link" data-keyword="${keywordText}" onclick="trackKeywordClick('${keywordText}', '${keyword.target_url}', '${userSession || ""}')">$1</a>`
 
           console.log(`🔗 Replacing with: ${linkHtml}`)
 

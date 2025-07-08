@@ -22,6 +22,8 @@ import {
   Bug,
   TestTube,
   RefreshCw,
+  BarChart3,
+  TrendingUp,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -320,7 +322,26 @@ export default function AdminPage() {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+            {/* Analytics Dashboard Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg">
+                  <BarChart3 className="w-5 h-5 mr-2" />
+                  Analytics Dashboard
+                </CardTitle>
+                <CardDescription>View detailed analytics and metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/dashboard">
+                  <Button className="w-full">
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                    View Analytics
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
             {/* Brand CSV Upload Card */}
             <Card>
               <CardHeader>
@@ -332,7 +353,7 @@ export default function AdminPage() {
               </CardHeader>
               <CardContent>
                 <Link href="/admin/brand-upload">
-                  <Button className="w-full">
+                  <Button className="w-full bg-transparent" variant="outline">
                     <Upload className="w-4 h-4 mr-2" />
                     Process Brand CSV
                   </Button>
