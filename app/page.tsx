@@ -8,21 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-  Send,
-  Bot,
-  User,
-  Settings,
-  Paperclip,
-  X,
-  FileText,
-  ImageIcon,
-  AlertCircle,
-  TestTube,
-  RefreshCw,
-} from "lucide-react"
+import { Send, Bot, User, Settings, Paperclip, X, FileText, ImageIcon, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { processMessageWithAds, testKeywordMatching, clearKeywordCache } from "@/lib/ad-processor"
+import { processMessageWithAds } from "@/lib/ad-processor"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ChatPage() {
@@ -30,22 +18,9 @@ export default function ChatPage() {
     api: "/api/chat",
     onError: (error) => {
       console.error("Chat error:", error)
-
-      // Parse error message for better user feedback
-      const errorMessage = error.message || "Failed to get AI response"
-      let errorDescription = "Please try again later."
-
-      if (error.message?.includes("API key")) {
-        errorDescription = "Please check your OpenAI API key configuration in the admin panel."
-      } else if (error.message?.includes("quota") || error.message?.includes("billing")) {
-        errorDescription = "Your OpenAI API quota has been exceeded. Please check your billing."
-      } else if (error.message?.includes("rate limit")) {
-        errorDescription = "Too many requests. Please wait a moment and try again."
-      }
-
       toast({
         title: "Chat Error",
-        description: `${errorMessage}. ${errorDescription}`,
+        description: error.message || "Failed to get AI response. Please try again.",
         variant: "destructive",
       })
     },
@@ -54,7 +29,6 @@ export default function ChatPage() {
   const [processedMessages, setProcessedMessages] = useState<any[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isUploading, setIsUploading] = useState(false)
-  const [processingAds, setProcessingAds] = useState(false)
   const [sessionId] = useState(() => Math.random().toString(36).substring(7))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
@@ -62,70 +36,6 @@ export default function ChatPage() {
   // Process messages with ad links when they update
   React.useEffect(() => {
     const processMessages = async () => {
-      if (messages.length === 0) {
-        setProcessedMessages([])
-        return
-      }
-
-      setProcessingAds(true)
-      console.log("Processing", messages.length, "messages for ads...")
-
-      try {
-        const processed = await Promise.all(
-          messages.map(async (message, index) => {
-            if (message.role === "assistant") {
-              console.log(`Processing assistant message ${index + 1}...`)
-              const processedContent = await processMessageWithAds(message.content, sessionId)
-              return { ...message, content: processedContent }
-            }
-            return message
-          }),
-        )
-
-        console.log("All messages processed successfully")
-        setProcessedMessages(processed)
-      } catch (error) {
-        console.error("Error processing messages:", error)
-        setProcessedMessages(messages) // Fallback to original messages
-        toast({
-          title: "Ad Processing Error",
-          description: "Failed to process keyword links. Messages will display without links.",
-          variant: "destructive",
-        })
-      } finally {
-        setProcessingAds(false)
-      }
-    }
-
-    processMessages()
-  }, [messages, sessionId, toast])
-
-  // Test keyword matching function
-  const testKeywords = async () => {
-    const testMessage =
-      "I love Nike shoes and Apple products. Tesla cars are amazing, and I use Amazon for shopping. Microsoft Office is great for work."
-
-    console.log("=== STARTING KEYWORD TEST ===")
-    await testKeywordMatching(testMessage)
-
-    // Also test the actual processing
-    console.log("=== TESTING ACTUAL PROCESSING ===")
-    const processed = await processMessageWithAds(testMessage)
-    console.log("Processed result:", processed)
-
-    toast({
-      title: "Keyword Test Complete",
-      description: "Check the browser console for detailed results.",
-    })
-  }
-
-  // Clear cache and reprocess
-  const refreshKeywords = async () => {
-    clearKeywordCache()
-
-    // Reprocess current messages
-    if (messages.length > 0) {
-      setProcessingAds(true)
       try {
         const processed = await Promise.all(
           messages.map(async (message) => {
@@ -137,55 +47,13 @@ export default function ChatPage() {
           }),
         )
         setProcessedMessages(processed)
-        toast({
-          title: "Keywords Refreshed",
-          description: "Keyword cache cleared and messages reprocessed.",
-        })
       } catch (error) {
-        console.error("Error refreshing keywords:", error)
-        toast({
-          title: "Refresh Failed",
-          description: "Failed to refresh keywords.",
-          variant: "destructive",
-        })
-      } finally {
-        setProcessingAds(false)
+        console.error("Error processing messages:", error)
+        setProcessedMessages(messages)
       }
-    } else {
-      toast({
-        title: "Keywords Refreshed",
-        description: "Keyword cache cleared.",
-      })
     }
-  }
-
-  // Enhanced API connection test
-  const testAPIConnection = async () => {
-    try {
-      // First test the diagnostic endpoint
-      const diagnosticResponse = await fetch("/api/test-openai")
-      const diagnosticData = await diagnosticResponse.json()
-
-      if (diagnosticData.success) {
-        toast({
-          title: "API Connection Test",
-          description: `OpenAI API is working! Response: ${diagnosticData.response}`,
-        })
-      } else {
-        toast({
-          title: "API Configuration Issue",
-          description: `${diagnosticData.error}. Check the admin diagnostics page for details.`,
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "API Test Failed",
-        description: error instanceof Error ? error.message : "Network error",
-        variant: "destructive",
-      })
-    }
-  }
+    processMessages()
+  }, [messages, sessionId])
 
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -320,6 +188,39 @@ export default function ChatPage() {
     setUploadedFiles([])
   }
 
+  // Test API connection
+  const testAPIConnection = async () => {
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Hello, are you working?" }],
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "API Connection Test",
+          description: "Chat API is working correctly!",
+        })
+      } else {
+        const errorText = await response.text()
+        toast({
+          title: "API Connection Failed",
+          description: `Error: ${response.status} - ${errorText}`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "API Connection Failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Function to format message content with proper markdown-like formatting
   const formatMessageContent = (content: string) => {
     let formatted = content
@@ -385,17 +286,8 @@ export default function ChatPage() {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               YawlAI
             </h1>
-            {processingAds && <div className="text-xs text-blue-600 animate-pulse">Processing ads...</div>}
           </div>
           <div className="flex items-center space-x-2">
-            <Button onClick={testKeywords} variant="outline" size="sm">
-              <TestTube className="w-4 h-4 mr-2" />
-              Test Keywords
-            </Button>
-            <Button onClick={refreshKeywords} variant="outline" size="sm" disabled={processingAds}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${processingAds ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
             <Button onClick={testAPIConnection} variant="outline" size="sm">
               <AlertCircle className="w-4 h-4 mr-2" />
               Test API
@@ -419,16 +311,9 @@ export default function ChatPage() {
               <p className="text-sm text-red-700">
                 <strong>Chat Error:</strong> {error.message}
               </p>
-              <div className="mt-2 flex space-x-2">
-                <Link href="/admin/api-diagnostics">
-                  <Button size="sm" variant="outline" className="text-xs bg-transparent">
-                    Check API Configuration
-                  </Button>
-                </Link>
-                <Button size="sm" variant="outline" className="text-xs bg-transparent" onClick={testAPIConnection}>
-                  Test Connection
-                </Button>
-              </div>
+              <p className="text-xs text-red-600 mt-1">
+                Please check your OpenAI API key configuration or try again later.
+              </p>
             </div>
           </div>
         </div>
@@ -444,11 +329,6 @@ export default function ChatPage() {
               <p className="text-gray-600 text-center max-w-md">
                 Your unrestricted AI assistant. Ask me anything or upload documents for analysis!
               </p>
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Try asking about:</strong> Nike, Apple, Tesla, Amazon, or any brands you've uploaded!
-                </p>
-              </div>
             </div>
           )}
 
@@ -520,7 +400,7 @@ export default function ChatPage() {
       </ScrollArea>
 
       {/* Input Form - Bottom Center */}
-      <div className="border-t bg-white p-4 mb-4">
+      <div className="border-t bg-white p-4">
         <div className="max-w-3xl mx-auto">
           {/* Uploaded Files Display */}
           {uploadedFiles.length > 0 && (
