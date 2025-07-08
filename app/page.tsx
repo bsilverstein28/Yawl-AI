@@ -30,9 +30,22 @@ export default function ChatPage() {
     api: "/api/chat",
     onError: (error) => {
       console.error("Chat error:", error)
+
+      // Parse error message for better user feedback
+      const errorMessage = error.message || "Failed to get AI response"
+      let errorDescription = "Please try again later."
+
+      if (error.message?.includes("API key")) {
+        errorDescription = "Please check your OpenAI API key configuration in the admin panel."
+      } else if (error.message?.includes("quota") || error.message?.includes("billing")) {
+        errorDescription = "Your OpenAI API quota has been exceeded. Please check your billing."
+      } else if (error.message?.includes("rate limit")) {
+        errorDescription = "Too many requests. Please wait a moment and try again."
+      }
+
       toast({
         title: "Chat Error",
-        description: error.message || "Failed to get AI response. Please try again.",
+        description: `${errorMessage}. ${errorDescription}`,
         variant: "destructive",
       })
     },
@@ -142,6 +155,34 @@ export default function ChatPage() {
       toast({
         title: "Keywords Refreshed",
         description: "Keyword cache cleared.",
+      })
+    }
+  }
+
+  // Enhanced API connection test
+  const testAPIConnection = async () => {
+    try {
+      // First test the diagnostic endpoint
+      const diagnosticResponse = await fetch("/api/test-openai")
+      const diagnosticData = await diagnosticResponse.json()
+
+      if (diagnosticData.success) {
+        toast({
+          title: "API Connection Test",
+          description: `OpenAI API is working! Response: ${diagnosticData.response}`,
+        })
+      } else {
+        toast({
+          title: "API Configuration Issue",
+          description: `${diagnosticData.error}. Check the admin diagnostics page for details.`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "API Test Failed",
+        description: error instanceof Error ? error.message : "Network error",
+        variant: "destructive",
       })
     }
   }
@@ -279,39 +320,6 @@ export default function ChatPage() {
     setUploadedFiles([])
   }
 
-  // Test API connection
-  const testAPIConnection = async () => {
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: "Hello, are you working?" }],
-        }),
-      })
-
-      if (response.ok) {
-        toast({
-          title: "API Connection Test",
-          description: "Chat API is working correctly!",
-        })
-      } else {
-        const errorText = await response.text()
-        toast({
-          title: "API Connection Failed",
-          description: `Error: ${response.status} - ${errorText}`,
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "API Connection Failed",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      })
-    }
-  }
-
   // Function to format message content with proper markdown-like formatting
   const formatMessageContent = (content: string) => {
     let formatted = content
@@ -411,9 +419,16 @@ export default function ChatPage() {
               <p className="text-sm text-red-700">
                 <strong>Chat Error:</strong> {error.message}
               </p>
-              <p className="text-xs text-red-600 mt-1">
-                Please check your OpenAI API key configuration or try again later.
-              </p>
+              <div className="mt-2 flex space-x-2">
+                <Link href="/admin/api-diagnostics">
+                  <Button size="sm" variant="outline" className="text-xs bg-transparent">
+                    Check API Configuration
+                  </Button>
+                </Link>
+                <Button size="sm" variant="outline" className="text-xs bg-transparent" onClick={testAPIConnection}>
+                  Test Connection
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -505,7 +520,7 @@ export default function ChatPage() {
       </ScrollArea>
 
       {/* Input Form - Bottom Center */}
-      <div className="border-t bg-white p-4">
+      <div className="border-t bg-white p-4 mb-4">
         <div className="max-w-3xl mx-auto">
           {/* Uploaded Files Display */}
           {uploadedFiles.length > 0 && (
