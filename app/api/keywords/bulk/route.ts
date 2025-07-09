@@ -5,129 +5,93 @@ export async function POST(request: Request) {
   const supabase = createServerClient()
 
   try {
-    // Check if the request contains form data (file upload) or JSON data
-    const contentType = request.headers.get("content-type")
+    const formData = await request.formData()
+    const file = formData.get("file") as File
 
-    if (contentType?.includes("multipart/form-data")) {
-      // Handle file upload
-      const formData = await request.formData()
-      const file = formData.get("file") as File
-
-      if (!file) {
-        return NextResponse.json({ error: "No file provided" }, { status: 400 })
-      }
-
-      // Read file content
-      const text = await file.text()
-      console.log("File content:", text.substring(0, 200)) // Debug log
-
-      // Parse CSV content
-      const lines = text.split("\n").filter((line) => line.trim())
-      if (lines.length < 2) {
-        return NextResponse.json({ error: "File must contain at least a header and one data row" }, { status: 400 })
-      }
-
-      // Skip header row and parse data
-      const dataLines = lines.slice(1)
-      const keywords = dataLines
-        .map((line) => {
-          // Handle CSV parsing with potential commas in quoted fields
-          const parts = line.split(",")
-          if (parts.length < 2) return null
-
-          const keyword = parts[0].trim().replace(/^"|"$/g, "")
-          const target_url = parts[1].trim().replace(/^"|"$/g, "")
-
-          return { keyword, target_url }
-        })
-        .filter((item) => item && item.keyword && item.target_url)
-
-      if (keywords.length === 0) {
-        return NextResponse.json({ error: "No valid keywords found in file" }, { status: 400 })
-      }
-
-      // Insert keywords
-      let inserted = 0
-      let skipped = 0
-      const errors: any[] = []
-
-      for (const keyword of keywords) {
-        try {
-          // Check if keyword already exists
-          const { data: existing } = await supabase
-            .from("keywords")
-            .select("id")
-            .eq("keyword", keyword.keyword)
-            .single()
-
-          if (existing) {
-            skipped++
-            continue
-          }
-
-          // Insert new keyword
-          const { error } = await supabase.from("keywords").insert({
-            keyword: keyword.keyword,
-            target_url: keyword.target_url,
-            is_active: true,
-          })
-
-          if (error) {
-            errors.push({ keyword: keyword.keyword, error: error.message })
-          } else {
-            inserted++
-          }
-        } catch (err) {
-          errors.push({ keyword: keyword.keyword, error: "Failed to insert" })
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        inserted,
-        skipped,
-        errors: errors.length,
-        errorDetails: errors,
-        message: `Successfully processed ${inserted + skipped} keywords. ${inserted} added, ${skipped} skipped (duplicates).`,
-      })
-    } else {
-      // Handle JSON data
-      const body = await request.json()
-      const keywords = body.keywords || []
-
-      if (!Array.isArray(keywords) || keywords.length === 0) {
-        return NextResponse.json({ error: "No keywords provided" }, { status: 400 })
-      }
-
-      // Process JSON keywords (existing logic)
-      let inserted = 0
-      const errors: any[] = []
-
-      for (const keyword of keywords) {
-        try {
-          const { error } = await supabase.from("keywords").insert({
-            keyword: keyword.keyword,
-            target_url: keyword.target_url,
-            is_active: keyword.active ?? true,
-          })
-
-          if (error) {
-            errors.push({ keyword: keyword.keyword, error: error.message })
-          } else {
-            inserted++
-          }
-        } catch (err) {
-          errors.push({ keyword: keyword.keyword, error: "Failed to insert" })
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        inserted,
-        errors: errors.length,
-        errorDetails: errors,
-      })
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
+
+    // Read file content
+    const text = await file.text()
+    console.log("File content preview:", text.substring(0, 200))
+
+    // Parse CSV content
+    const lines = text.split("\n").filter((line) => line.trim())
+    if (lines.length < 2) {
+      return NextResponse.json({ error: "File must contain at least a header and one data row" }, { status: 400 })
+    }
+
+    // Skip header row and parse data
+    const dataLines = lines.slice(1)
+    const keywords = []
+
+    for (const line of dataLines) {
+      const trimmedLine = line.trim()
+      if (!trimmedLine) continue
+
+      // Simple CSV parsing - split by comma and clean quotes
+      const parts = trimmedLine.split(",")
+      if (parts.length >= 2) {
+        const keyword = parts[0].trim().replace(/^"|"$/g, "")
+        const target_url = parts[1].trim().replace(/^"|"$/g, "")
+
+        if (keyword && target_url) {
+          keywords.push({ keyword, target_url })
+        }
+      }
+    }
+
+    if (keywords.length === 0) {
+      return NextResponse.json({ error: "No valid keywords found in file" }, { status: 400 })
+    }
+
+    // Insert keywords one by one to handle duplicates
+    let inserted = 0
+    let skipped = 0
+    const errors: any[] = []
+
+    for (const keywordData of keywords) {
+      try {
+        // Check if keyword already exists
+        const { data: existing } = await supabase
+          .from("keywords")
+          .select("id")
+          .eq("keyword", keywordData.keyword)
+          .single()
+
+        if (existing) {
+          skipped++
+          continue
+        }
+
+        // Insert new keyword
+        const { error } = await supabase.from("keywords").insert({
+          keyword: keywordData.keyword,
+          target_url: keywordData.target_url,
+          is_active: true,
+        })
+
+        if (error) {
+          console.error("Insert error:", error)
+          errors.push({ keyword: keywordData.keyword, error: error.message })
+        } else {
+          inserted++
+        }
+      } catch (err) {
+        console.error("Processing error:", err)
+        errors.push({ keyword: keywordData.keyword, error: "Failed to process" })
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      inserted,
+      skipped,
+      errors: errors.length,
+      errorDetails: errors,
+      message: `Successfully processed ${inserted + skipped} keywords. ${inserted} added, ${skipped} skipped (duplicates).`,
+    })
   } catch (error) {
     console.error("Error bulk uploading keywords:", error)
     return NextResponse.json(

@@ -3,16 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
+  Home,
+  Settings,
   BarChart3,
   Database,
   FileText,
-  Home,
-  KeyRound,
-  MessageSquare,
-  Settings,
+  Activity,
   TrendingUp,
-  Upload,
-  Users,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  MessageSquare,
 } from "lucide-react"
 
 export default function AdminDashboard() {
@@ -22,17 +23,14 @@ export default function AdminDashboard() {
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Breadcrumb */}
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <Link href="/" className="flex items-center hover:text-blue-600 transition-colors">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="flex items-center text-sm text-gray-600 hover:text-gray-900">
                 <Home className="w-4 h-4 mr-1" />
                 Back to Chat
               </Link>
-              <span>/</span>
-              <span className="text-gray-900 font-medium">Admin Dashboard</span>
+              <span className="text-gray-300">/</span>
+              <span className="text-sm font-medium text-gray-900">Admin Dashboard</span>
             </div>
-
-            {/* Header Actions */}
             <Link href="/">
               <Button variant="outline">
                 <MessageSquare className="w-4 h-4 mr-2" />
@@ -43,21 +41,20 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600 mt-2">Manage your YawlAI chat system and keyword database</p>
+          <p className="text-gray-600 mt-2">Manage your YawlAI chat system and monitor performance</p>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <MessageSquare className="w-6 h-6 text-blue-600" />
+                <div className="flex-shrink-0">
+                  <MessageSquare className="h-8 w-8 text-blue-600" />
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Total Chats</p>
@@ -70,11 +67,11 @@ export default function AdminDashboard() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <KeyRound className="w-6 h-6 text-green-600" />
+                <div className="flex-shrink-0">
+                  <FileText className="h-8 w-8 text-green-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Active Keywords</p>
+                  <p className="text-sm font-medium text-gray-600">Keywords</p>
                   <p className="text-2xl font-bold text-gray-900">567</p>
                 </div>
               </div>
@@ -84,11 +81,11 @@ export default function AdminDashboard() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <TrendingUp className="w-6 h-6 text-purple-600" />
+                <div className="flex-shrink-0">
+                  <TrendingUp className="h-8 w-8 text-purple-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Ad Impressions</p>
+                  <p className="text-sm font-medium text-gray-600">Impressions</p>
                   <p className="text-2xl font-bold text-gray-900">12.3K</p>
                 </div>
               </div>
@@ -98,8 +95,8 @@ export default function AdminDashboard() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Users className="w-6 h-6 text-orange-600" />
+                <div className="flex-shrink-0">
+                  <Activity className="h-8 w-8 text-orange-600" />
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Active Users</p>
@@ -110,48 +107,37 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Main Actions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Main Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
           {/* Keyword Management */}
-          <Card className="hover:shadow-lg transition-shadow">
+          <Card className="col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center">
-                <KeyRound className="w-5 h-5 mr-2 text-blue-600" />
+                <FileText className="w-5 h-5 mr-2 text-blue-600" />
                 Keyword Management
-                <Badge className="ml-2" variant="default">
-                  Primary
-                </Badge>
               </CardTitle>
               <CardDescription>Manage keywords and target URLs for ad integration</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <Link href="/admin/keywords">
-                  <Button className="w-full">
+                  <Button className="w-full justify-start">
                     <Settings className="w-4 h-4 mr-2" />
                     Manage Keywords
                   </Button>
                 </Link>
-                <div className="grid grid-cols-2 gap-2">
-                  <Link href="/admin/keywords">
-                    <Button variant="outline" size="sm" className="w-full bg-transparent">
-                      <FileText className="w-3 h-3 mr-1" />
-                      Add Single
-                    </Button>
-                  </Link>
-                  <Link href="/admin/keywords">
-                    <Button variant="outline" size="sm" className="w-full bg-transparent">
-                      <Upload className="w-3 h-3 mr-1" />
-                      Bulk Upload
-                    </Button>
-                  </Link>
+                <div className="text-sm text-gray-600">
+                  <p>• Add individual keywords</p>
+                  <p>• Bulk upload via CSV</p>
+                  <p>• Edit and delete keywords</p>
+                  <p>• Toggle active/inactive status</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Analytics */}
-          <Card className="hover:shadow-lg transition-shadow">
+          {/* Analytics Dashboard */}
+          <Card className="col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BarChart3 className="w-5 h-5 mr-2 text-green-600" />
@@ -162,41 +148,43 @@ export default function AdminDashboard() {
             <CardContent>
               <div className="space-y-3">
                 <Link href="/dashboard">
-                  <Button className="w-full bg-transparent" variant="outline">
-                    <TrendingUp className="w-4 h-4 mr-2" />
+                  <Button variant="outline" className="w-full justify-start bg-transparent">
+                    <BarChart3 className="w-4 h-4 mr-2" />
                     View Analytics
                   </Button>
                 </Link>
                 <div className="text-sm text-gray-600">
-                  <p>• Chat performance metrics</p>
-                  <p>• Keyword effectiveness</p>
-                  <p>• User engagement data</p>
+                  <p>• Chat usage statistics</p>
+                  <p>• Keyword performance</p>
+                  <p>• User engagement metrics</p>
+                  <p>• Revenue tracking</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Database Management */}
-          <Card className="hover:shadow-lg transition-shadow">
+          {/* Database Tools */}
+          <Card className="col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Database className="w-5 h-5 mr-2 text-purple-600" />
                 Database Tools
               </CardTitle>
-              <CardDescription>Database status and management tools</CardDescription>
+              <CardDescription>Database management and diagnostics</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <Link href="/admin/database-status">
-                  <Button className="w-full bg-transparent" variant="outline">
+                  <Button variant="outline" className="w-full justify-start bg-transparent">
                     <Database className="w-4 h-4 mr-2" />
                     Database Status
                   </Button>
                 </Link>
                 <div className="text-sm text-gray-600">
-                  <p>• Connection status</p>
-                  <p>• Table health checks</p>
-                  <p>• Performance monitoring</p>
+                  <p>• Check database connection</p>
+                  <p>• View table status</p>
+                  <p>• Run diagnostics</p>
+                  <p>• Monitor performance</p>
                 </div>
               </div>
             </CardContent>
@@ -206,62 +194,71 @@ export default function AdminDashboard() {
         {/* Recent Activity */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="flex items-center">
+              <Clock className="w-5 h-5 mr-2" />
+              Recent Activity
+            </CardTitle>
             <CardDescription>Latest system events and updates</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
-                <div className="p-1 bg-blue-100 rounded">
-                  <KeyRound className="w-4 h-4 text-blue-600" />
-                </div>
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-500" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium">New keywords added</p>
-                  <p className="text-xs text-gray-600">5 keywords added via bulk upload</p>
+                  <p className="text-sm font-medium">Database connection established</p>
+                  <p className="text-xs text-gray-500">2 minutes ago</p>
                 </div>
-                <span className="text-xs text-gray-500">2 min ago</span>
+                <Badge variant="secondary">System</Badge>
               </div>
 
-              <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
-                <div className="p-1 bg-green-100 rounded">
-                  <MessageSquare className="w-4 h-4 text-green-600" />
-                </div>
+              <div className="flex items-center space-x-3">
+                <FileText className="w-5 h-5 text-blue-500" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium">Chat session completed</p>
-                  <p className="text-xs text-gray-600">User completed conversation with 3 ad integrations</p>
+                  <p className="text-sm font-medium">New keywords added to database</p>
+                  <p className="text-xs text-gray-500">15 minutes ago</p>
                 </div>
-                <span className="text-xs text-gray-500">5 min ago</span>
+                <Badge variant="secondary">Keywords</Badge>
               </div>
 
-              <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg">
-                <div className="p-1 bg-purple-100 rounded">
-                  <TrendingUp className="w-4 h-4 text-purple-600" />
-                </div>
+              <div className="flex items-center space-x-3">
+                <MessageSquare className="w-5 h-5 text-purple-500" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium">Analytics updated</p>
-                  <p className="text-xs text-gray-600">Daily metrics processed successfully</p>
+                  <p className="text-sm font-medium">Chat session completed successfully</p>
+                  <p className="text-xs text-gray-500">1 hour ago</p>
                 </div>
-                <span className="text-xs text-gray-500">1 hour ago</span>
+                <Badge variant="secondary">Chat</Badge>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <AlertCircle className="w-5 h-5 text-orange-500" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Analytics data updated</p>
+                  <p className="text-xs text-gray-500">2 hours ago</p>
+                </div>
+                <Badge variant="secondary">Analytics</Badge>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200">
-          <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
-              <Link href="/" className="hover:text-blue-600 transition-colors">
-                Return to Chat
+        <div className="mt-8 pt-8 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between items-center">
+            <div className="flex space-x-6 mb-4 sm:mb-0">
+              <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">
+                Chat Interface
               </Link>
-              <Link href="/dashboard" className="hover:text-blue-600 transition-colors">
-                Analytics
-              </Link>
-              <Link href="/admin/keywords" className="hover:text-blue-600 transition-colors">
+              <Link href="/admin/keywords" className="text-sm text-gray-600 hover:text-gray-900">
                 Keywords
               </Link>
+              <Link href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900">
+                Analytics
+              </Link>
+              <Link href="/admin/database-status" className="text-sm text-gray-600 hover:text-gray-900">
+                Database
+              </Link>
             </div>
-            <div className="text-sm text-gray-500">YawlAI Admin Dashboard v1.0</div>
+            <p className="text-sm text-gray-500">YawlAI Admin Dashboard v1.0</p>
           </div>
         </div>
       </div>

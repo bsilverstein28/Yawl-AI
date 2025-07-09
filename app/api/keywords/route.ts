@@ -12,14 +12,13 @@ export async function GET() {
 
     if (error) {
       console.error("Database error:", error)
-      // Return empty array if table doesn't exist
-      return NextResponse.json([])
+      return NextResponse.json({ keywords: [] })
     }
 
-    return NextResponse.json(keywords || [])
+    return NextResponse.json({ keywords: keywords || [] })
   } catch (error) {
     console.error("Error fetching keywords:", error)
-    return NextResponse.json([])
+    return NextResponse.json({ keywords: [] })
   }
 }
 
@@ -29,9 +28,26 @@ export async function POST(request: Request) {
   try {
     const { keyword, target_url, active = true } = await request.json()
 
-    const { data, error } = await supabase.from("keywords").insert([{ keyword, target_url, active }]).select().single()
+    if (!keyword || !target_url) {
+      return NextResponse.json({ error: "Keyword and target URL are required" }, { status: 400 })
+    }
 
-    if (error) throw error
+    const { data, error } = await supabase
+      .from("keywords")
+      .insert([
+        {
+          keyword: keyword.trim(),
+          target_url: target_url.trim(),
+          is_active: active,
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Database error:", error)
+      return NextResponse.json({ error: "Failed to create keyword" }, { status: 500 })
+    }
 
     return NextResponse.json(data)
   } catch (error) {
@@ -44,16 +60,24 @@ export async function PUT(request: Request) {
   const supabase = createServerClient()
 
   try {
-    const { id, keyword, target_url, active } = await request.json()
+    const { id, keyword, target_url, is_active } = await request.json()
 
-    const { data, error } = await supabase
-      .from("keywords")
-      .update({ keyword, target_url, active, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single()
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 })
+    }
 
-    if (error) throw error
+    const updateData: any = { updated_at: new Date().toISOString() }
+
+    if (keyword !== undefined) updateData.keyword = keyword.trim()
+    if (target_url !== undefined) updateData.target_url = target_url.trim()
+    if (is_active !== undefined) updateData.is_active = is_active
+
+    const { data, error } = await supabase.from("keywords").update(updateData).eq("id", id).select().single()
+
+    if (error) {
+      console.error("Database error:", error)
+      return NextResponse.json({ error: "Failed to update keyword" }, { status: 500 })
+    }
 
     return NextResponse.json(data)
   } catch (error) {
@@ -75,7 +99,10 @@ export async function DELETE(request: Request) {
 
     const { error } = await supabase.from("keywords").delete().eq("id", Number.parseInt(id))
 
-    if (error) throw error
+    if (error) {
+      console.error("Database error:", error)
+      return NextResponse.json({ error: "Failed to delete keyword" }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
