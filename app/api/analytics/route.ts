@@ -21,19 +21,19 @@ export async function GET(request: NextRequest) {
 
     // Check if analytics tables exist
     const analyticsTableExists = await tableExists("analytics_summary")
-    const keywordImpressionExists = await tableExists("keyword_impressions")
-    const keywordClickExists = await tableExists("keyword_clicks")
-    const searchTrackingExists = await tableExists("search_tracking")
+    const searchesTableExists = await tableExists("searches")
+    const impressionsTableExists = await tableExists("impressions")
+    const clicksTableExists = await tableExists("clicks")
 
     console.log("📊 Table status:", {
       analytics_summary: analyticsTableExists,
-      keyword_impressions: keywordImpressionExists,
-      keyword_clicks: keywordClickExists,
-      search_tracking: searchTrackingExists,
+      searches: searchesTableExists,
+      impressions: impressionsTableExists,
+      clicks: clicksTableExists,
     })
 
     // If tables don't exist, return setup message with mock data
-    if (!analyticsTableExists || !keywordImpressionExists || !keywordClickExists || !searchTrackingExists) {
+    if (!analyticsTableExists || !searchesTableExists || !impressionsTableExists || !clicksTableExists) {
       console.log("⚠️ Analytics tables missing - returning setup data")
       return NextResponse.json({
         needsSetup: true,
@@ -66,55 +66,37 @@ export async function GET(request: NextRequest) {
       console.error("Error fetching summary:", summaryError)
     }
 
-    // Fetch keyword performance
-    const { data: keywordData, error: keywordError } = await supabase
-      .from("keyword_impressions")
-      .select(`
-        keyword,
-        count(*) as impressions,
-        keyword_clicks!inner(count)
-      `)
+    // Fetch keyword performance from impressions and clicks tables
+    const { data: impressionData, error: impressionError } = await supabase
+      .from("impressions")
+      .select("keyword, created_at")
       .gte("created_at", today)
-      .group("keyword")
-      .order("impressions", { ascending: false })
-      .limit(10)
 
-    if (keywordError) {
-      console.error("Error fetching keyword data:", keywordError)
-    }
+    const { data: clickData, error: clickError } = await supabase
+      .from("clicks")
+      .select("keyword, created_at")
+      .gte("created_at", today)
 
-    // Fetch recent activity
+    // Fetch recent activity from searches table
     const { data: recentSearches, error: searchError } = await supabase
-      .from("search_tracking")
+      .from("searches")
       .select("query_text, created_at, session_id")
       .order("created_at", { ascending: false })
       .limit(10)
 
-    if (searchError) {
-      console.error("Error fetching recent searches:", searchError)
-    }
-
     // Fetch recent impressions
-    const { data: recentImpressions, error: impressionError } = await supabase
-      .from("keyword_impressions")
+    const { data: recentImpressions, error: impressionError2 } = await supabase
+      .from("impressions")
       .select("keyword, created_at, user_session")
       .order("created_at", { ascending: false })
       .limit(10)
 
-    if (impressionError) {
-      console.error("Error fetching recent impressions:", impressionError)
-    }
-
     // Fetch recent clicks
-    const { data: recentClicks, error: clickError } = await supabase
-      .from("keyword_clicks")
+    const { data: recentClicks, error: clickError2 } = await supabase
+      .from("clicks")
       .select("keyword, target_url, created_at, user_session")
       .order("created_at", { ascending: false })
       .limit(10)
-
-    if (clickError) {
-      console.error("Error fetching recent clicks:", clickError)
-    }
 
     // Calculate totals
     const totals = {
@@ -126,12 +108,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Process keyword performance
-    const topKeywords = (keywordData || []).map((item: any) => ({
+    const topKeywords = (impressionData || []).map((item: any) => ({
       keyword: item.keyword,
-      impressions: item.impressions,
-      clicks: item.keyword_clicks?.[0]?.count || 0,
-      ctr: item.impressions > 0 ? ((item.keyword_clicks?.[0]?.count || 0) / item.impressions) * 100 : 0,
-      revenue: (item.keyword_clicks?.[0]?.count || 0) * 0.05,
+      impressions: impressionData.length,
+      clicks: clickData?.filter((click: any) => click.keyword === item.keyword).length || 0,
+      ctr:
+        impressionData.length > 0
+          ? ((clickData?.filter((click: any) => click.keyword === item.keyword).length || 0) / impressionData.length) *
+            100
+          : 0,
+      revenue: (clickData?.filter((click: any) => click.keyword === item.keyword).length || 0) * 0.05,
     }))
 
     // Combine recent activity
