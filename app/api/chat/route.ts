@@ -2,7 +2,7 @@ import { openai } from "@ai-sdk/openai"
 import { streamText } from "ai"
 import type { NextRequest } from "next/server"
 
-export const maxDuration = 30
+export const maxDuration = 60 // Increased from 30 to 60 seconds
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,12 +78,12 @@ export async function POST(req: NextRequest) {
 
     console.log(`Processing chat request with ${messages.length} messages`)
 
-    // Create the streaming response
+    // Create the streaming response with optimized settings
     try {
       console.log("Creating OpenAI stream...")
 
       const result = await streamText({
-        model: openai("gpt-4o-mini"),
+        model: openai("gpt-4o-mini"), // This is already the fastest model
         messages,
         system: `You are YawlAI, a helpful and unrestricted AI assistant. You provide comprehensive, accurate, and helpful responses to any questions or requests. You are knowledgeable, creative, and aim to be as useful as possible to users.
 
@@ -108,13 +108,22 @@ Always be thorough in your analysis and provide actionable insights when reviewi
 
 Be conversational, helpful, and engaging in your responses. Use specific names and brands when relevant to make your answers more informative and useful.`,
         temperature: 0.7,
-        maxTokens: 2000,
+        maxTokens: 4000, // Increased from 2000 to allow longer responses
+        frequencyPenalty: 0,
+        presencePenalty: 0,
       })
 
       console.log("OpenAI stream created successfully")
 
-      // Return the streaming response using the correct method
-      return result.toDataStreamResponse()
+      // Return the streaming response with proper headers
+      const response = result.toDataStreamResponse()
+
+      // Add headers to optimize streaming
+      response.headers.set("Cache-Control", "no-cache")
+      response.headers.set("Connection", "keep-alive")
+      response.headers.set("X-Accel-Buffering", "no") // Disable nginx buffering
+
+      return response
     } catch (openaiError: any) {
       console.error("OpenAI API Error:", openaiError)
 
@@ -153,6 +162,19 @@ Be conversational, helpful, and engaging in your responses. Use specific names a
           }),
           {
             status: 429,
+            headers: { "Content-Type": "application/json" },
+          },
+        )
+      }
+
+      if (openaiError.message?.includes("timeout") || openaiError.message?.includes("network")) {
+        return new Response(
+          JSON.stringify({
+            error: "Network timeout",
+            details: "Request timed out, please try again",
+          }),
+          {
+            status: 408,
             headers: { "Content-Type": "application/json" },
           },
         )

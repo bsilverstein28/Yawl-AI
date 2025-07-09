@@ -8,7 +8,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Send, Bot, User, Settings, Paperclip, X, FileText, ImageIcon, AlertCircle, Plus } from "lucide-react"
+import {
+  Send,
+  Bot,
+  User,
+  Settings,
+  Paperclip,
+  X,
+  FileText,
+  ImageIcon,
+  AlertCircle,
+  Plus,
+  Wifi,
+  WifiOff,
+} from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { processMessageWithAds } from "@/lib/ad-processor"
@@ -24,6 +37,9 @@ declare global {
 export default function ChatPage() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, append, error, setInput } = useChat({
     api: "/api/chat",
+    // Optimize chat settings for better performance
+    streamMode: "text",
+    keepLastMessageOnError: true,
     onError: (error) => {
       console.error("Chat error:", error)
 
@@ -37,6 +53,8 @@ export default function ChatPage() {
         errorDescription = "Your OpenAI API quota has been exceeded. Please check your billing."
       } else if (error.message?.includes("rate limit")) {
         errorDescription = "Too many requests. Please wait a moment and try again."
+      } else if (error.message?.includes("timeout") || error.message?.includes("network")) {
+        errorDescription = "Request timed out. Please check your connection and try again."
       }
 
       toast({
@@ -45,6 +63,9 @@ export default function ChatPage() {
         variant: "destructive",
       })
     },
+    onFinish: (message) => {
+      console.log("✅ Message completed:", message.content.length, "characters")
+    },
   })
 
   const [processedMessages, setProcessedMessages] = useState<any[]>([])
@@ -52,8 +73,23 @@ export default function ChatPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [processingAds, setProcessingAds] = useState(false)
   const [sessionId] = useState(() => Math.random().toString(36).substring(7))
+  const [connectionStatus, setConnectionStatus] = useState<"online" | "offline">("online")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+
+  // Monitor connection status
+  React.useEffect(() => {
+    const handleOnline = () => setConnectionStatus("online")
+    const handleOffline = () => setConnectionStatus("offline")
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [])
 
   // Track chat questions/prompts
   const trackChatQuestion = async (question: string) => {
@@ -113,11 +149,17 @@ export default function ChatPage() {
     window.location.reload()
   }
 
-  // Process messages with ad links when they update
+  // Optimized ad processing - only process when messages change and not loading
   React.useEffect(() => {
     const processMessages = async () => {
       if (messages.length === 0) {
         setProcessedMessages([])
+        return
+      }
+
+      // Don't process ads while still loading to avoid interrupting the stream
+      if (isLoading) {
+        setProcessedMessages(messages)
         return
       }
 
@@ -151,8 +193,10 @@ export default function ChatPage() {
       }
     }
 
-    processMessages()
-  }, [messages, sessionId, toast])
+    // Add a small delay to avoid processing while streaming
+    const timeoutId = setTimeout(processMessages, isLoading ? 0 : 500)
+    return () => clearTimeout(timeoutId)
+  }, [messages, isLoading, sessionId, toast])
 
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,12 +276,22 @@ export default function ChatPage() {
 
     if (!input.trim() && uploadedFiles.length === 0) return
 
+    // Check connection status
+    if (connectionStatus === "offline") {
+      toast({
+        title: "No Internet Connection",
+        description: "Please check your internet connection and try again.",
+        variant: "destructive",
+      })
+      return
+    }
+
     let messageContent = input
 
     // Track the chat question
     await trackChatQuestion(input)
 
-    // Process uploaded files
+    // Process uploaded files with size limits for better performance
     if (uploadedFiles.length > 0) {
       try {
         const fileContents = await Promise.all(
@@ -250,10 +304,13 @@ export default function ChatPage() {
               }
             } else {
               const text = await file.text()
+              // Limit file content to prevent overly long requests
+              const truncatedText =
+                text.length > 50000 ? text.substring(0, 50000) + "\n\n[Content truncated due to length...]" : text
               return {
                 name: file.name,
                 type: "document",
-                content: text,
+                content: truncatedText,
               }
             }
           }),
@@ -441,8 +498,16 @@ export default function ChatPage() {
               YawlAI
             </h1>
           </Link>
-          {processingAds && <div className="text-xs text-blue-600 animate-pulse">Processing ads...</div>}
           <div className="flex items-center space-x-2">
+            {/* Connection Status Indicator */}
+            <div className="flex items-center space-x-1">
+              {connectionStatus === "online" ? (
+                <Wifi className="w-4 h-4 text-green-500" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-red-500" />
+              )}
+            </div>
+            {processingAds && <div className="text-xs text-blue-600 animate-pulse">Processing ads...</div>}
             <Button onClick={startNewChat} variant="outline" size="sm" className="bg-transparent">
               <Plus className="w-4 h-4 mr-2" />
               New Chat
@@ -599,7 +664,7 @@ export default function ChatPage() {
                 onChange={handleInputChange}
                 placeholder="Message YawlAI..."
                 className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-4 py-3 text-base text-gray-900 placeholder-gray-500"
-                disabled={isLoading}
+                disabled={isLoading || connectionStatus === "offline"}
               />
               <div className="flex items-center space-x-1 mr-2">
                 <Button
@@ -607,14 +672,16 @@ export default function ChatPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading || isUploading}
+                  disabled={isLoading || isUploading || connectionStatus === "offline"}
                   className="rounded-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100"
                 >
                   <Paperclip className="w-4 h-4" />
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isLoading || (!input.trim() && uploadedFiles.length === 0)}
+                  disabled={
+                    isLoading || (!input.trim() && uploadedFiles.length === 0) || connectionStatus === "offline"
+                  }
                   size="sm"
                   className="rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 disabled:opacity-50 border-0"
                 >
