@@ -11,130 +11,115 @@ export interface ChatSession {
   messages: ChatMessage[]
   createdAt: Date
   updatedAt: Date
-  messageCount: number
 }
 
 const STORAGE_KEY = "yawlai_chat_history"
-const MAX_SESSIONS = 50 // Limit to prevent storage bloat
+const MAX_SESSIONS = 100 // Limit to prevent storage bloat
 
-// Generate a title from the first user message
-function generateChatTitle(messages: ChatMessage[]): string {
-  const firstUserMessage = messages.find((m) => m.role === "user")
-  if (!firstUserMessage) return "New Chat"
+export class ChatStorage {
+  static getSessions(): ChatSession[] {
+    if (typeof window === "undefined") return []
 
-  const content = firstUserMessage.content.trim()
-  if (content.length <= 50) return content
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (!stored) return []
 
-  // Try to find a natural break point
-  const words = content.split(" ")
-  let title = ""
-  for (const word of words) {
-    if ((title + " " + word).length > 50) break
-    title += (title ? " " : "") + word
+      const sessions = JSON.parse(stored)
+      return sessions.map((session: any) => ({
+        ...session,
+        createdAt: new Date(session.createdAt),
+        updatedAt: new Date(session.updatedAt),
+        messages: session.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        })),
+      }))
+    } catch (error) {
+      console.error("Error loading chat sessions:", error)
+      return []
+    }
   }
 
-  return title || content.substring(0, 50) + "..."
-}
+  static saveSession(session: ChatSession): void {
+    if (typeof window === "undefined") return
 
-// Get all chat sessions from localStorage
-export function getChatSessions(): ChatSession[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) return []
+    try {
+      const sessions = this.getSessions()
+      const existingIndex = sessions.findIndex((s) => s.id === session.id)
 
-    const sessions = JSON.parse(stored)
-    return sessions.map((session: any) => ({
-      ...session,
-      createdAt: new Date(session.createdAt),
-      updatedAt: new Date(session.updatedAt),
-      messages: session.messages.map((msg: any) => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp),
-      })),
-    }))
-  } catch (error) {
-    console.error("Error loading chat sessions:", error)
-    return []
+      if (existingIndex >= 0) {
+        sessions[existingIndex] = session
+      } else {
+        sessions.unshift(session)
+
+        // Limit the number of stored sessions
+        if (sessions.length > MAX_SESSIONS) {
+          sessions.splice(MAX_SESSIONS)
+        }
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
+    } catch (error) {
+      console.error("Error saving chat session:", error)
+    }
   }
-}
 
-// Save a chat session
-export function saveChatSession(messages: ChatMessage[], sessionId?: string): string {
-  try {
-    if (messages.length === 0) return sessionId || ""
+  static deleteSession(sessionId: string): void {
+    if (typeof window === "undefined") return
 
-    const sessions = getChatSessions()
+    try {
+      const sessions = this.getSessions()
+      const filtered = sessions.filter((s) => s.id !== sessionId)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
+    } catch (error) {
+      console.error("Error deleting chat session:", error)
+    }
+  }
+
+  static clearAllSessions(): void {
+    if (typeof window === "undefined") return
+
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch (error) {
+      console.error("Error clearing chat sessions:", error)
+    }
+  }
+
+  static exportSession(sessionId: string): string | null {
+    const sessions = this.getSessions()
+    const session = sessions.find((s) => s.id === sessionId)
+
+    if (!session) return null
+
+    return JSON.stringify(session, null, 2)
+  }
+
+  static exportAllSessions(): string {
+    const sessions = this.getSessions()
+    return JSON.stringify(sessions, null, 2)
+  }
+
+  static generateTitle(firstMessage: string): string {
+    // Generate a title from the first user message
+    const words = firstMessage.trim().split(" ")
+    if (words.length <= 6) {
+      return firstMessage
+    }
+    return words.slice(0, 6).join(" ") + "..."
+  }
+
+  static createSession(messages: ChatMessage[]): ChatSession {
     const now = new Date()
+    const firstUserMessage = messages.find((m) => m.role === "user")
+    const title = firstUserMessage ? this.generateTitle(firstUserMessage.content) : "New Chat"
 
-    const existingIndex = sessionId ? sessions.findIndex((s) => s.id === sessionId) : -1
-
-    const chatSession: ChatSession = {
-      id: sessionId || generateId(),
-      title: generateChatTitle(messages),
-      messages: messages,
-      createdAt: existingIndex >= 0 ? sessions[existingIndex].createdAt : now,
+    return {
+      id: crypto.randomUUID(),
+      title,
+      messages,
+      createdAt: now,
       updatedAt: now,
-      messageCount: messages.length,
     }
-
-    if (existingIndex >= 0) {
-      sessions[existingIndex] = chatSession
-    } else {
-      sessions.unshift(chatSession) // Add to beginning
-    }
-
-    // Limit the number of stored sessions
-    const limitedSessions = sessions.slice(0, MAX_SESSIONS)
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(limitedSessions))
-    return chatSession.id
-  } catch (error) {
-    console.error("Error saving chat session:", error)
-    return sessionId || ""
   }
-}
-
-// Delete a chat session
-export function deleteChatSession(sessionId: string): void {
-  try {
-    const sessions = getChatSessions()
-    const filteredSessions = sessions.filter((s) => s.id !== sessionId)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredSessions))
-  } catch (error) {
-    console.error("Error deleting chat session:", error)
-  }
-}
-
-// Get a specific chat session
-export function getChatSession(sessionId: string): ChatSession | null {
-  const sessions = getChatSessions()
-  return sessions.find((s) => s.id === sessionId) || null
-}
-
-// Clear all chat history
-export function clearAllChatHistory(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY)
-  } catch (error) {
-    console.error("Error clearing chat history:", error)
-  }
-}
-
-// Generate a unique ID
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2)
-}
-
-// Export chat session as JSON
-export function exportChatSession(sessionId: string): string {
-  const session = getChatSession(sessionId)
-  if (!session) throw new Error("Session not found")
-
-  return JSON.stringify(session, null, 2)
-}
-
-// Export all chat history
-export function exportAllChatHistory(): string {
-  const sessions = getChatSessions()
-  return JSON.stringify(sessions, null, 2)
 }

@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-
 import { useState, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
 import { Button } from "@/components/ui/button"
@@ -27,7 +26,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { processMessageWithAds } from "@/lib/ad-processor"
 import { useToast } from "@/hooks/use-toast"
-import { saveChatSession, type ChatMessage, type ChatSession } from "@/lib/chat-storage"
+import { ChatStorage, type ChatMessage, type ChatSession } from "@/lib/chat-storage"
 
 // Global function to track keyword clicks
 declare global {
@@ -141,9 +140,25 @@ export default function ChatPage() {
       timestamp: msg.createdAt || new Date(),
     }))
 
-    const savedId = saveChatSession(chatMessages, currentChatId)
-    if (!currentChatId) {
-      setCurrentChatId(savedId)
+    // Create or update session
+    if (currentChatId) {
+      // Update existing session
+      const existingSessions = ChatStorage.getSessions()
+      const existingSession = existingSessions.find((s) => s.id === currentChatId)
+      if (existingSession) {
+        const updatedSession: ChatSession = {
+          ...existingSession,
+          messages: chatMessages,
+          updatedAt: new Date(),
+          title: chatMessages.length > 0 ? ChatStorage.generateTitle(chatMessages[0].content) : existingSession.title,
+        }
+        ChatStorage.saveSession(updatedSession)
+      }
+    } else {
+      // Create new session
+      const newSession = ChatStorage.createSession(chatMessages)
+      ChatStorage.saveSession(newSession)
+      setCurrentChatId(newSession.id)
     }
   }
 
@@ -215,7 +230,7 @@ export default function ChatPage() {
   }
 
   // Optimized ad processing - only process when messages change and not loading
-  React.useEffect(() => {
+  useEffect(() => {
     const processMessages = async () => {
       if (messages.length === 0) {
         setProcessedMessages([])

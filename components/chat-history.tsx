@@ -1,12 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,26 +18,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
-  History,
-  Search,
-  Trash2,
-  Download,
-  Eye,
-  MessageSquare,
-  Calendar,
-  Clock,
-  X,
-  FileDown,
-  Trash,
-} from "lucide-react"
-import {
-  getChatSessions,
-  deleteChatSession,
-  clearAllChatHistory,
-  exportChatSession,
-  exportAllChatHistory,
-  type ChatSession,
-} from "@/lib/chat-storage"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Search, Trash2, Download, Eye, MessageSquare, Calendar, RotateCcw } from "lucide-react"
+import { ChatStorage, type ChatSession } from "@/lib/chat-storage"
 import { useToast } from "@/hooks/use-toast"
 
 interface ChatHistoryProps {
@@ -47,63 +35,51 @@ interface ChatHistoryProps {
 
 export default function ChatHistory({ onLoadChat }: ChatHistoryProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [filteredSessions, setFilteredSessions] = useState<ChatSession[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null)
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const { toast } = useToast()
 
-  // Load sessions on component mount
   useEffect(() => {
     loadSessions()
   }, [])
 
-  // Filter sessions based on search query
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredSessions(sessions)
-    } else {
-      const query = searchQuery.toLowerCase()
-      const filtered = sessions.filter(
-        (session) =>
-          session.title.toLowerCase().includes(query) ||
-          session.messages.some((msg) => msg.content.toLowerCase().includes(query)),
-      )
-      setFilteredSessions(filtered)
-    }
-  }, [sessions, searchQuery])
-
   const loadSessions = () => {
-    const loadedSessions = getChatSessions()
+    const loadedSessions = ChatStorage.getSessions()
     setSessions(loadedSessions)
   }
 
-  const handleDeleteSession = (sessionId: string) => {
-    deleteChatSession(sessionId)
-    loadSessions()
+  const filteredSessions = sessions.filter(
+    (session) =>
+      session.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      session.messages.some((msg) => msg.content.toLowerCase().includes(searchTerm.toLowerCase())),
+  )
+
+  const deleteSession = (sessionId: string) => {
+    ChatStorage.deleteSession(sessionId)
+    setSessions(sessions.filter((s) => s.id !== sessionId))
     toast({
       title: "Chat Deleted",
-      description: "The chat session has been removed from your history.",
+      description: "The chat session has been deleted successfully.",
     })
   }
 
-  const handleClearAllHistory = () => {
-    clearAllChatHistory()
-    loadSessions()
+  const clearAllHistory = () => {
+    ChatStorage.clearAllSessions()
+    setSessions([])
     toast({
       title: "History Cleared",
       description: "All chat history has been cleared.",
     })
   }
 
-  const handleExportSession = (session: ChatSession) => {
-    try {
-      const jsonData = exportChatSession(session.id)
-      const blob = new Blob([jsonData], { type: "application/json" })
+  const exportSession = (sessionId: string) => {
+    const exported = ChatStorage.exportSession(sessionId)
+    if (exported) {
+      const blob = new Blob([exported], { type: "application/json" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `chat-${session.title.replace(/[^a-zA-Z0-9]/g, "-")}-${session.id}.json`
+      a.download = `chat-${sessionId}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -111,117 +87,91 @@ export default function ChatHistory({ onLoadChat }: ChatHistoryProps) {
 
       toast({
         title: "Chat Exported",
-        description: "Chat session has been downloaded as JSON.",
-      })
-    } catch (error) {
-      toast({
-        title: "Export Failed",
-        description: "Failed to export chat session.",
-        variant: "destructive",
+        description: "The chat has been downloaded as a JSON file.",
       })
     }
   }
 
-  const handleExportAll = () => {
-    try {
-      const jsonData = exportAllChatHistory()
-      const blob = new Blob([jsonData], { type: "application/json" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `yawlai-chat-history-${new Date().toISOString().split("T")[0]}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+  const exportAllSessions = () => {
+    const exported = ChatStorage.exportAllSessions()
+    const blob = new Blob([exported], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `all-chats-${new Date().toISOString().split("T")[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
 
-      toast({
-        title: "History Exported",
-        description: "All chat history has been downloaded as JSON.",
-      })
-    } catch (error) {
-      toast({
-        title: "Export Failed",
-        description: "Failed to export chat history.",
-        variant: "destructive",
-      })
-    }
+    toast({
+      title: "All Chats Exported",
+      description: "All chat history has been downloaded as a JSON file.",
+    })
   }
 
-  const handleViewSession = (session: ChatSession) => {
-    setSelectedSession(session)
-    setIsViewDialogOpen(true)
-  }
-
-  const handleLoadChat = (session: ChatSession) => {
+  const loadChat = (session: ChatSession) => {
     if (onLoadChat) {
       onLoadChat(session)
       toast({
         title: "Chat Loaded",
-        description: "Previous conversation has been loaded.",
+        description: `Loaded chat: ${session.title}`,
       })
     }
   }
 
   const formatDate = (date: Date) => {
     const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const diffTime = Math.abs(now.getTime() - date.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-    if (diffDays === 0) {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    } else if (diffDays === 1) {
-      return "Yesterday"
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`
-    } else {
-      return date.toLocaleDateString()
-    }
+    if (diffDays === 1) return "Today"
+    if (diffDays === 2) return "Yesterday"
+    if (diffDays <= 7) return `${diffDays - 1} days ago`
+
+    return date.toLocaleDateString()
   }
 
-  const formatMessageContent = (content: string) => {
-    // Remove HTML tags and truncate
-    const plainText = content.replace(/<[^>]*>/g, "")
-    return plainText.length > 100 ? plainText.substring(0, 100) + "..." : plainText
+  const getLastMessage = (session: ChatSession) => {
+    const lastMessage = session.messages[session.messages.length - 1]
+    if (!lastMessage) return "No messages"
+
+    const content = lastMessage.content
+    return content.length > 100 ? content.substring(0, 100) + "..." : content
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold flex items-center">
-            <History className="w-6 h-6 mr-2" />
-            Chat History
-          </h2>
-          <p className="text-gray-600 mt-1">
-            {sessions.length} conversation{sessions.length !== 1 ? "s" : ""} saved
-          </p>
+          <h2 className="text-2xl font-bold">Chat History</h2>
+          <p className="text-gray-600">Browse and manage your previous conversations</p>
         </div>
-        <div className="flex space-x-2">
-          <Button onClick={handleExportAll} variant="outline" size="sm">
-            <FileDown className="w-4 h-4 mr-2" />
+
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={exportAllSessions} variant="outline" disabled={sessions.length === 0}>
+            <Download className="w-4 h-4 mr-2" />
             Export All
           </Button>
+
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
-                <Trash className="w-4 h-4 mr-2" />
+              <Button variant="outline" disabled={sessions.length === 0}>
+                <Trash2 className="w-4 h-4 mr-2" />
                 Clear All
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Clear All Chat History?</AlertDialogTitle>
+                <AlertDialogTitle>Clear All Chat History</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will permanently delete all your saved conversations. This action cannot be undone.
+                  Are you sure you want to delete all chat history? This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearAllHistory} className="bg-red-600 hover:bg-red-700">
-                  Clear All
-                </AlertDialogAction>
+                <AlertDialogAction onClick={clearAllHistory}>Clear All</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -229,208 +179,181 @@ export default function ChatHistory({ onLoadChat }: ChatHistoryProps) {
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <Input
-          placeholder="Search conversations..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+      <Card>
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search chat history..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Chat Sessions List */}
-      {filteredSessions.length === 0 ? (
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <History className="w-12 h-12 text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {sessions.length === 0 ? "No Chat History" : "No Results Found"}
-            </h3>
-            <p className="text-gray-500 text-center max-w-md">
-              {sessions.length === 0
-                ? "Your conversations will appear here after you start chatting with YawlAI."
-                : "Try adjusting your search terms to find the conversation you're looking for."}
-            </p>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <MessageSquare className="w-4 h-4 text-blue-500" />
+              <div>
+                <p className="text-2xl font-bold">{sessions.length}</p>
+                <p className="text-sm text-gray-600">Total Chats</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-3">
-          {filteredSessions.map((session) => (
-            <Card key={session.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h3 className="font-medium text-gray-900 truncate">{session.title}</h3>
-                      <Badge variant="secondary" className="text-xs">
-                        {session.messageCount} messages
-                      </Badge>
-                    </div>
 
-                    <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>{formatDate(session.updatedAt)}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Clock className="w-3 h-3" />
-                        <span>Updated {formatDate(session.updatedAt)}</span>
-                      </div>
-                    </div>
-
-                    {/* Preview of last message */}
-                    {session.messages.length > 0 && (
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">
-                          {session.messages[session.messages.length - 1].role === "user" ? "You: " : "YawlAI: "}
-                        </span>
-                        {formatMessageContent(session.messages[session.messages.length - 1].content)}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-1 ml-4">
-                    <Button
-                      onClick={() => handleViewSession(session)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-
-                    {onLoadChat && (
-                      <Button
-                        onClick={() => handleLoadChat(session)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-500 hover:text-blue-700"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                      </Button>
-                    )}
-
-                    <Button
-                      onClick={() => handleExportSession(session)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Chat?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete "{session.title}" and all its messages. This action cannot be
-                            undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteSession(session.id)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* View Chat Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{selectedSession?.title}</span>
-              <Button onClick={() => setIsViewDialogOpen(false)} variant="ghost" size="sm">
-                <X className="w-4 h-4" />
-              </Button>
-            </DialogTitle>
-            <DialogDescription>
-              {selectedSession && (
-                <div className="flex items-center space-x-4 text-sm">
-                  <span>{selectedSession.messageCount} messages</span>
-                  <span>•</span>
-                  <span>Created {formatDate(selectedSession.createdAt)}</span>
-                  <span>•</span>
-                  <span>Updated {formatDate(selectedSession.updatedAt)}</span>
-                </div>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <ScrollArea className="max-h-[60vh]">
-            <div className="space-y-4">
-              {selectedSession?.messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex items-start space-x-3 p-3 rounded-lg ${
-                    message.role === "user" ? "bg-blue-50" : "bg-gray-50"
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm ${
-                      message.role === "user" ? "bg-blue-500" : "bg-gray-500"
-                    }`}
-                  >
-                    {message.role === "user" ? "U" : "AI"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium text-sm">{message.role === "user" ? "You" : "YawlAI"}</span>
-                      <span className="text-xs text-gray-500">{message.timestamp.toLocaleTimeString()}</span>
-                    </div>
-                    <div
-                      className="text-sm text-gray-800 whitespace-pre-wrap"
-                      dangerouslySetInnerHTML={{
-                        __html: message.role === "assistant" ? message.content : message.content.replace(/\n/g, "<br>"),
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold">
+                  {
+                    sessions.filter((s) => {
+                      const today = new Date()
+                      const sessionDate = new Date(s.updatedAt)
+                      return sessionDate.toDateString() === today.toDateString()
+                    }).length
+                  }
+                </p>
+                <p className="text-sm text-gray-600">Today</p>
+              </div>
             </div>
-          </ScrollArea>
+          </CardContent>
+        </Card>
 
-          <div className="flex justify-end space-x-2 pt-4 border-t">
-            {onLoadChat && selectedSession && (
-              <Button
-                onClick={() => {
-                  handleLoadChat(selectedSession)
-                  setIsViewDialogOpen(false)
-                }}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Continue Chat
-              </Button>
-            )}
-            {selectedSession && (
-              <Button onClick={() => handleExportSession(selectedSession)} variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <MessageSquare className="w-4 h-4 text-purple-500" />
+              <div>
+                <p className="text-2xl font-bold">
+                  {sessions.reduce((total, session) => total + session.messages.length, 0)}
+                </p>
+                <p className="text-sm text-gray-600">Total Messages</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Chat Sessions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Conversations ({filteredSessions.length})</CardTitle>
+          <CardDescription>
+            {searchTerm ? `Showing results for "${searchTerm}"` : "Your recent chat sessions"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {filteredSessions.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {searchTerm
+                ? "No chats match your search"
+                : "No chat history found. Start a conversation to see it here!"}
+            </div>
+          ) : (
+            <ScrollArea className="h-96">
+              <div className="space-y-4">
+                {filteredSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium truncate">{session.title}</h3>
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{getLastMessage(session)}</p>
+                        <div className="flex items-center space-x-4 mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {session.messages.length} messages
+                          </Badge>
+                          <span className="text-xs text-gray-500">{formatDate(new Date(session.updatedAt))}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2 ml-4">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={() => setSelectedSession(session)}>
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl max-h-[80vh]">
+                            <DialogHeader>
+                              <DialogTitle>{selectedSession?.title}</DialogTitle>
+                              <DialogDescription>
+                                Chat from {selectedSession && formatDate(new Date(selectedSession.createdAt))}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <ScrollArea className="h-96">
+                              <div className="space-y-4">
+                                {selectedSession?.messages.map((message, index) => (
+                                  <div
+                                    key={index}
+                                    className={`p-3 rounded-lg ${
+                                      message.role === "user" ? "bg-blue-50 ml-8" : "bg-gray-50 mr-8"
+                                    }`}
+                                  >
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <Badge variant={message.role === "user" ? "default" : "secondary"}>
+                                        {message.role === "user" ? "You" : "AI"}
+                                      </Badge>
+                                      <span className="text-xs text-gray-500">
+                                        {new Date(message.timestamp).toLocaleTimeString()}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </ScrollArea>
+                          </DialogContent>
+                        </Dialog>
+
+                        {onLoadChat && (
+                          <Button variant="outline" size="sm" onClick={() => loadChat(session)}>
+                            <RotateCcw className="w-3 h-3" />
+                          </Button>
+                        )}
+
+                        <Button variant="outline" size="sm" onClick={() => exportSession(session.id)}>
+                          <Download className="w-3 h-3" />
+                        </Button>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{session.title}"? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteSession(session.id)}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
