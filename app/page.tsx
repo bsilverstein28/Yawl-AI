@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,11 +21,13 @@ import {
   Plus,
   Wifi,
   WifiOff,
+  History,
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { processMessageWithAds } from "@/lib/ad-processor"
 import { useToast } from "@/hooks/use-toast"
+import { saveChatSession, type ChatMessage, type ChatSession } from "@/lib/chat-storage"
 
 // Global function to track keyword clicks
 declare global {
@@ -35,38 +37,42 @@ declare global {
 }
 
 export default function ChatPage() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, append, error, setInput } = useChat({
-    api: "/api/chat",
-    // Optimize chat settings for better performance
-    streamMode: "text",
-    keepLastMessageOnError: true,
-    onError: (error) => {
-      console.error("Chat error:", error)
+  const { messages, input, handleInputChange, handleSubmit, isLoading, append, error, setInput, setMessages } = useChat(
+    {
+      api: "/api/chat",
+      // Optimize chat settings for better performance
+      streamMode: "text",
+      keepLastMessageOnError: true,
+      onError: (error) => {
+        console.error("Chat error:", error)
 
-      // Parse error message for better user feedback
-      const errorMessage = error.message || "Failed to get AI response"
-      let errorDescription = "Please try again later."
+        // Parse error message for better user feedback
+        const errorMessage = error.message || "Failed to get AI response"
+        let errorDescription = "Please try again later."
 
-      if (error.message?.includes("API key")) {
-        errorDescription = "Please check your OpenAI API key configuration in the admin panel."
-      } else if (error.message?.includes("quota") || error.message?.includes("billing")) {
-        errorDescription = "Your OpenAI API quota has been exceeded. Please check your billing."
-      } else if (error.message?.includes("rate limit")) {
-        errorDescription = "Too many requests. Please wait a moment and try again."
-      } else if (error.message?.includes("timeout") || error.message?.includes("network")) {
-        errorDescription = "Request timed out. Please check your connection and try again."
-      }
+        if (error.message?.includes("API key")) {
+          errorDescription = "Please check your OpenAI API key configuration in the admin panel."
+        } else if (error.message?.includes("quota") || error.message?.includes("billing")) {
+          errorDescription = "Your OpenAI API quota has been exceeded. Please check your billing."
+        } else if (error.message?.includes("rate limit")) {
+          errorDescription = "Too many requests. Please wait a moment and try again."
+        } else if (error.message?.includes("timeout") || error.message?.includes("network")) {
+          errorDescription = "Request timed out. Please check your connection and try again."
+        }
 
-      toast({
-        title: "Chat Error",
-        description: `${errorMessage}. ${errorDescription}`,
-        variant: "destructive",
-      })
+        toast({
+          title: "Chat Error",
+          description: `${errorMessage}. ${errorDescription}`,
+          variant: "destructive",
+        })
+      },
+      onFinish: (message) => {
+        console.log("✅ Message completed:", message.content.length, "characters")
+        // Save chat session after each completed message
+        saveCurrentChat()
+      },
     },
-    onFinish: (message) => {
-      console.log("✅ Message completed:", message.content.length, "characters")
-    },
-  })
+  )
 
   const [processedMessages, setProcessedMessages] = useState<any[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
@@ -74,6 +80,7 @@ export default function ChatPage() {
   const [processingAds, setProcessingAds] = useState(false)
   const [sessionId] = useState(() => Math.random().toString(36).substring(7))
   const [connectionStatus, setConnectionStatus] = useState<"online" | "offline">("online")
+  const [currentChatId, setCurrentChatId] = useState<string>("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -90,6 +97,55 @@ export default function ChatPage() {
       window.removeEventListener("offline", handleOffline)
     }
   }, [])
+
+  // Check for chat session to load on page load
+  useEffect(() => {
+    const loadSessionData = sessionStorage.getItem("loadChatSession")
+    if (loadSessionData) {
+      try {
+        const session: ChatSession = JSON.parse(loadSessionData)
+        // Convert the stored messages to the format expected by useChat
+        const chatMessages = session.messages.map((msg) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          createdAt: msg.timestamp,
+        }))
+        setMessages(chatMessages)
+        setCurrentChatId(session.id)
+        sessionStorage.removeItem("loadChatSession")
+
+        toast({
+          title: "Chat Loaded",
+          description: `Loaded "${session.title}" with ${session.messages.length} messages.`,
+        })
+      } catch (error) {
+        console.error("Error loading chat session:", error)
+        toast({
+          title: "Load Error",
+          description: "Failed to load the selected chat session.",
+          variant: "destructive",
+        })
+      }
+    }
+  }, [setMessages, toast])
+
+  // Save current chat session
+  const saveCurrentChat = () => {
+    if (messages.length === 0) return
+
+    const chatMessages: ChatMessage[] = messages.map((msg) => ({
+      id: msg.id,
+      role: msg.role as "user" | "assistant",
+      content: msg.content,
+      timestamp: msg.createdAt || new Date(),
+    }))
+
+    const savedId = saveChatSession(chatMessages, currentChatId)
+    if (!currentChatId) {
+      setCurrentChatId(savedId)
+    }
+  }
 
   // Track chat questions/prompts
   const trackChatQuestion = async (question: string) => {
@@ -140,13 +196,22 @@ export default function ChatPage() {
   }, [])
 
   const startNewChat = () => {
+    // Save current chat before starting new one
+    if (messages.length > 0) {
+      saveCurrentChat()
+    }
+
     // Clear all messages and reset the chat
+    setMessages([])
     setProcessedMessages([])
     setUploadedFiles([])
     setInput("")
+    setCurrentChatId("")
 
-    // Reset the useChat hook by reloading the page or using a more elegant solution
-    window.location.reload()
+    toast({
+      title: "New Chat Started",
+      description: "Previous conversation has been saved to history.",
+    })
   }
 
   // Optimized ad processing - only process when messages change and not loading
@@ -508,6 +573,12 @@ export default function ChatPage() {
               )}
             </div>
             {processingAds && <div className="text-xs text-blue-600 animate-pulse">Processing ads...</div>}
+            <Link href="/history">
+              <Button variant="outline" size="sm" className="bg-transparent">
+                <History className="w-4 h-4 mr-2" />
+                History
+              </Button>
+            </Link>
             <Button onClick={startNewChat} variant="outline" size="sm" className="bg-transparent">
               <Plus className="w-4 h-4 mr-2" />
               New Chat
@@ -637,19 +708,18 @@ export default function ChatPage() {
         <div className="max-w-4xl mx-auto">
           {/* Uploaded Files Display */}
           {uploadedFiles.length > 0 && (
-            <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-              <div className="text-sm font-medium text-gray-700 mb-2">Uploaded Files:</div>
+            <div className="mb-3 p-3 bg-gray-50 rounded-lg border">
+              <div className="text-sm text-gray-600 mb-2">Uploaded files ({uploadedFiles.length}):</div>
               <div className="flex flex-wrap gap-2">
                 {uploadedFiles.map((file, index) => (
-                  <div key={index} className="flex items-center space-x-2 bg-white px-3 py-2 rounded-md border text-sm">
+                  <div key={index} className="flex items-center space-x-2 bg-white px-3 py-1 rounded-md border">
                     {getFileIcon(file)}
-                    <span className="truncate max-w-32">{file.name}</span>
+                    <span className="text-sm text-gray-700 truncate max-w-[200px]">{file.name}</span>
                     <button
-                      type="button"
                       onClick={() => removeFile(index)}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="text-gray-400 hover:text-red-500 transition-colors"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
@@ -657,49 +727,56 @@ export default function ChatPage() {
             </div>
           )}
 
-          <form onSubmit={handleFormSubmit} className="relative">
-            <div className="flex items-center bg-white border border-gray-300 rounded-xl shadow-sm focus-within:shadow-md transition-shadow">
+          <form onSubmit={handleFormSubmit} className="flex items-end space-x-3">
+            <div className="flex-1 relative">
               <Input
                 value={input}
                 onChange={handleInputChange}
-                placeholder="Message YawlAI..."
-                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-4 py-3 text-base text-gray-900 placeholder-gray-500"
+                placeholder={
+                  connectionStatus === "offline"
+                    ? "No internet connection..."
+                    : "Ask YawlAI anything... (or upload files)"
+                }
                 disabled={isLoading || connectionStatus === "offline"}
-              />
-              <div className="flex items-center space-x-1 mr-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading || isUploading || connectionStatus === "offline"}
-                  className="rounded-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-                >
-                  <Paperclip className="w-4 h-4" />
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={
-                    isLoading || (!input.trim() && uploadedFiles.length === 0) || connectionStatus === "offline"
+                className="pr-12 py-3 text-base resize-none min-h-[48px] bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleFormSubmit(e)
                   }
-                  size="sm"
-                  className="rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 disabled:opacity-50 border-0"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
+                }}
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".txt,.md,.pdf,.doc,.docx,.csv,.json,.jpg,.jpeg,.png,.gif,.webp"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading || isLoading}
+                variant="ghost"
+                size="sm"
+                className="absolute right-12 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <Paperclip className="w-4 h-4" />
+              </Button>
             </div>
+            <Button
+              type="submit"
+              disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading || connectionStatus === "offline"}
+              className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
           </form>
 
-          {/* Hidden File Input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".txt,.md,.pdf,.doc,.docx,.csv,.json,.jpg,.jpeg,.png,.gif,.webp"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
+          <div className="text-xs text-gray-500 mt-2 text-center">
+            YawlAI can make mistakes. Please verify important information.
+          </div>
         </div>
       </div>
     </div>
