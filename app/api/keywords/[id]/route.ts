@@ -5,7 +5,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   const supabase = createServerClient()
 
   try {
-    const { keyword, target_url, is_active } = await request.json()
+    const { keyword, target_url, active } = await request.json()
     const id = params.id
 
     if (!id) {
@@ -16,7 +16,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     if (keyword !== undefined) updateData.keyword = keyword.trim()
     if (target_url !== undefined) updateData.target_url = target_url.trim()
-    if (is_active !== undefined) updateData.is_active = is_active
+    if (active !== undefined) updateData.active = active
 
     const { data, error } = await supabase
       .from("keywords")

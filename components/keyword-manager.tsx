@@ -37,7 +37,7 @@ interface Keyword {
   id: number
   keyword: string
   target_url: string
-  is_active: boolean
+  active: boolean
   created_at: string
   updated_at: string
 }
@@ -220,7 +220,7 @@ export function KeywordManager() {
       const response = await fetch(`/api/keywords/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: isActive }),
+        body: JSON.stringify({ active: isActive }),
       })
 
       if (response.ok) {
@@ -391,8 +391,8 @@ export function KeywordManager() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
                           <span className="font-medium text-gray-900">{keyword.keyword}</span>
-                          <Badge variant={keyword.is_active ? "default" : "secondary"}>
-                            {keyword.is_active ? "Active" : "Inactive"}
+                          <Badge variant={keyword.active ? "default" : "secondary"}>
+                            {keyword.active ? "Active" : "Inactive"}
                           </Badge>
                         </div>
                         <div className="flex items-center space-x-2 mt-1">
@@ -409,7 +409,7 @@ export function KeywordManager() {
                       </div>
                       <div className="flex items-center space-x-2 ml-4">
                         <Switch
-                          checked={keyword.is_active}
+                          checked={keyword.active}
                           onCheckedChange={(checked) => toggleKeywordStatus(keyword.id, checked)}
                         />
                         <Dialog>

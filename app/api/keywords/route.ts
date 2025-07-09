@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         {
           keyword: keyword.trim(),
           target_url: target_url.trim(),
-          is_active: active,
+          active: active,
         },
       ])
       .select()
@@ -60,7 +60,7 @@ export async function PUT(request: Request) {
   const supabase = createServerClient()
 
   try {
-    const { id, keyword, target_url, is_active } = await request.json()
+    const { id, keyword, target_url, active } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 })
@@ -70,7 +70,7 @@ export async function PUT(request: Request) {
 
     if (keyword !== undefined) updateData.keyword = keyword.trim()
     if (target_url !== undefined) updateData.target_url = target_url.trim()
-    if (is_active !== undefined) updateData.is_active = is_active
+    if (active !== undefined) updateData.active = active
 
     const { data, error } = await supabase.from("keywords").update(updateData).eq("id", id).select().single()
 

@@ -146,7 +146,8 @@ export async function processMessageWithAds(content: string, userSession?: strin
           await trackKeywordImpression(keywordText, userSession)
 
           // Replace with link - use a more specific replacement to avoid double-linking
-          const linkHtml = `<a href="${keyword.target_url}" target="_blank" rel="noopener noreferrer" class="ad-link" data-keyword="${keywordText}" onclick="trackKeywordClick('${keywordText}', '${keyword.target_url}', '${userSession || ""}')">$1</a>`
+          // Fixed: Use proper onclick handler that works in production
+          const linkHtml = `<a href="${keyword.target_url}" target="_blank" rel="noopener noreferrer" class="ad-link text-blue-600 hover:text-blue-800 underline" data-keyword="${keywordText}" onclick="if(window.trackKeywordClick) window.trackKeywordClick('${keywordText}', '${keyword.target_url}', '${userSession || ""}')">$1</a>`
 
           console.log(`🔗 Replacing with: ${linkHtml}`)
 
