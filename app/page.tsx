@@ -427,7 +427,7 @@ export default function ChatPage() {
       {/* Header - Updated with new logo */}
       <header className="border-b bg-white sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <div className="w-10 h-10 flex items-center justify-center">
               <Image
                 src="/yawlai-logo.png"
@@ -440,8 +440,8 @@ export default function ChatPage() {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               YawlAI
             </h1>
-            {processingAds && <div className="text-xs text-blue-600 animate-pulse">Processing ads...</div>}
-          </div>
+          </Link>
+          {processingAds && <div className="text-xs text-blue-600 animate-pulse">Processing ads...</div>}
           <div className="flex items-center space-x-2">
             <Button onClick={startNewChat} variant="outline" size="sm" className="bg-transparent">
               <Plus className="w-4 h-4 mr-2" />
