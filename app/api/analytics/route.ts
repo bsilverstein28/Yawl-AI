@@ -17,7 +17,7 @@ async function tableExists(tableName: string): Promise<boolean> {
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("🔍 Fetching analytics data...")
+    console.log("🔍 Fetching real analytics data...")
 
     // Check if analytics tables exist
     const analyticsTableExists = await tableExists("analytics_summary")
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       clicks: clicksTableExists,
     })
 
-    // If tables don't exist, return setup message with mock data
+    // If tables don't exist, return setup message
     if (!analyticsTableExists || !searchesTableExists || !impressionsTableExists || !clicksTableExists) {
       console.log("⚠️ Analytics tables missing - returning setup data")
       return NextResponse.json({
@@ -52,110 +52,165 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get today's date for filtering
-    const today = new Date().toISOString().split("T")[0]
+    // Fetch real data from all tables
+    console.log("📈 Fetching real analytics data from database...")
 
-    // Fetch analytics summary
-    const { data: summaryData, error: summaryError } = await supabase
-      .from("analytics_summary")
-      .select("*")
-      .eq("date", today)
-      .single()
-
-    if (summaryError && !summaryError.message.includes("No rows")) {
-      console.error("Error fetching summary:", summaryError)
-    }
-
-    // Fetch keyword performance from impressions and clicks tables
-    const { data: impressionData, error: impressionError } = await supabase
-      .from("impressions")
-      .select("keyword, created_at")
-      .gte("created_at", today)
-
-    const { data: clickData, error: clickError } = await supabase
-      .from("clicks")
-      .select("keyword, created_at")
-      .gte("created_at", today)
-
-    // Fetch recent activity from searches table
-    const { data: recentSearches, error: searchError } = await supabase
+    // Get total counts
+    const { data: totalSearches, error: searchCountError } = await supabase
       .from("searches")
-      .select("query_text, created_at, session_id")
-      .order("created_at", { ascending: false })
-      .limit(10)
+      .select("*", { count: "exact", head: true })
 
-    // Fetch recent impressions
-    const { data: recentImpressions, error: impressionError2 } = await supabase
+    const { data: totalImpressions, error: impressionCountError } = await supabase
       .from("impressions")
-      .select("keyword, created_at, user_session")
-      .order("created_at", { ascending: false })
-      .limit(10)
+      .select("*", { count: "exact", head: true })
 
-    // Fetch recent clicks
-    const { data: recentClicks, error: clickError2 } = await supabase
+    const { data: totalClicks, error: clickCountError } = await supabase
       .from("clicks")
-      .select("keyword, target_url, created_at, user_session")
-      .order("created_at", { ascending: false })
-      .limit(10)
+      .select("*", { count: "exact", head: true })
 
-    // Calculate totals
+    // Get actual search data
+    const { data: searchData, error: searchDataError } = await supabase
+      .from("searches")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100)
+
+    // Get actual impression data
+    const { data: impressionData, error: impressionDataError } = await supabase
+      .from("impressions")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100)
+
+    // Get actual click data
+    const { data: clickData, error: clickDataError } = await supabase
+      .from("clicks")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100)
+
+    // Get token usage data if available
+    const { data: tokenData, error: tokenError } = await supabase
+      .from("token_usage")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50)
+
+    // Calculate real totals
+    const searchCount = totalSearches?.length || 0
+    const impressionCount = totalImpressions?.length || 0
+    const clickCount = totalClicks?.length || 0
+
     const totals = {
-      chat_questions: summaryData?.total_searches || 0,
-      keywords_shown: summaryData?.total_impressions || 0,
-      keyword_clicks: summaryData?.total_clicks || 0,
-      ctr: summaryData?.total_impressions > 0 ? (summaryData?.total_clicks / summaryData?.total_impressions) * 100 : 0,
-      revenue: (summaryData?.total_clicks || 0) * 0.05, // $0.05 per click
+      chat_questions: searchCount,
+      keywords_shown: impressionCount,
+      keyword_clicks: clickCount,
+      ctr: impressionCount > 0 ? (clickCount / impressionCount) * 100 : 0,
+      revenue: clickCount * 0.05, // $0.05 per click
     }
 
-    // Process keyword performance
-    const topKeywords = (impressionData || []).map((item: any) => ({
-      keyword: item.keyword,
-      impressions: impressionData.length,
-      clicks: clickData?.filter((click: any) => click.keyword === item.keyword).length || 0,
-      ctr:
-        impressionData.length > 0
-          ? ((clickData?.filter((click: any) => click.keyword === item.keyword).length || 0) / impressionData.length) *
-            100
-          : 0,
-      revenue: (clickData?.filter((click: any) => click.keyword === item.keyword).length || 0) * 0.05,
-    }))
+    // Process keyword performance from real data
+    const keywordStats = new Map()
 
-    // Combine recent activity
+    // Count impressions per keyword
+    impressionData?.forEach((impression: any) => {
+      const keyword = impression.keyword
+      if (!keywordStats.has(keyword)) {
+        keywordStats.set(keyword, { impressions: 0, clicks: 0 })
+      }
+      keywordStats.get(keyword).impressions++
+    })
+
+    // Count clicks per keyword
+    clickData?.forEach((click: any) => {
+      const keyword = click.keyword
+      if (!keywordStats.has(keyword)) {
+        keywordStats.set(keyword, { impressions: 0, clicks: 0 })
+      }
+      keywordStats.get(keyword).clicks++
+    })
+
+    // Convert to top keywords array
+    const topKeywords = Array.from(keywordStats.entries())
+      .map(([keyword, stats]: [string, any]) => ({
+        keyword,
+        impressions: stats.impressions,
+        clicks: stats.clicks,
+        ctr: stats.impressions > 0 ? (stats.clicks / stats.impressions) * 100 : 0,
+        revenue: stats.clicks * 0.05,
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10)
+
+    // Create real recent activity from actual data
     const recentActivity = [
-      ...(recentSearches || []).map((item: any) => ({
+      ...(searchData?.slice(0, 10).map((item: any) => ({
         type: "search",
-        content: item.query_text,
+        content: item.query_text?.substring(0, 100) + (item.query_text?.length > 100 ? "..." : ""),
         timestamp: item.created_at,
-        session: item.session_id,
-      })),
-      ...(recentImpressions || []).map((item: any) => ({
+        session: item.session_id || item.user_session || "unknown",
+      })) || []),
+      ...(impressionData?.slice(0, 10).map((item: any) => ({
         type: "impression",
-        content: `Keyword: ${item.keyword}`,
+        content: `Keyword shown: ${item.keyword}`,
         timestamp: item.created_at,
-        session: item.user_session,
-      })),
-      ...(recentClicks || []).map((item: any) => ({
+        session: item.user_session || "unknown",
+      })) || []),
+      ...(clickData?.slice(0, 10).map((item: any) => ({
         type: "click",
         content: `Clicked: ${item.keyword} → ${item.target_url}`,
         timestamp: item.created_at,
-        session: item.user_session,
-      })),
+        session: item.user_session || "unknown",
+      })) || []),
     ]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 20)
 
-    // Mock daily stats for the last 7 days
-    const dailyStats = Array.from({ length: 7 }, (_, i) => {
+    // Calculate real daily stats for the last 7 days
+    const dailyStats = []
+    for (let i = 6; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
-      return {
-        date: date.toISOString().split("T")[0],
-        searches: Math.floor(Math.random() * 50) + 10,
-        impressions: Math.floor(Math.random() * 200) + 50,
-        clicks: Math.floor(Math.random() * 20) + 5,
-        revenue: (Math.floor(Math.random() * 20) + 5) * 0.05,
+      const dateStr = date.toISOString().split("T")[0]
+
+      const daySearches = searchData?.filter((item: any) => item.created_at?.startsWith(dateStr)).length || 0
+
+      const dayImpressions = impressionData?.filter((item: any) => item.created_at?.startsWith(dateStr)).length || 0
+
+      const dayClicks = clickData?.filter((item: any) => item.created_at?.startsWith(dateStr)).length || 0
+
+      dailyStats.push({
+        date: dateStr,
+        searches: daySearches,
+        impressions: dayImpressions,
+        clicks: dayClicks,
+        revenue: dayClicks * 0.05,
+      })
+    }
+
+    // Process token usage sessions
+    const sessionTokens = new Map()
+    tokenData?.forEach((token: any) => {
+      const sessionId = token.session_id || token.user_session
+      if (!sessionTokens.has(sessionId)) {
+        sessionTokens.set(sessionId, {
+          session_id: sessionId,
+          total_tokens: 0,
+          message_count: 0,
+          last_activity: token.created_at,
+        })
       }
-    }).reverse()
+      const session = sessionTokens.get(sessionId)
+      session.total_tokens += (token.input_tokens || 0) + (token.output_tokens || 0)
+      session.message_count++
+      if (token.created_at > session.last_activity) {
+        session.last_activity = token.created_at
+      }
+    })
+
+    const topTokenSessions = Array.from(sessionTokens.values())
+      .sort((a, b) => b.total_tokens - a.total_tokens)
+      .slice(0, 10)
 
     const response = {
       needsSetup: false,
@@ -163,10 +218,17 @@ export async function GET(request: NextRequest) {
       dailyStats,
       topKeywords,
       recentActivity,
-      topTokenSessions: [], // This would need token tracking implementation
+      topTokenSessions,
     }
 
-    console.log("✅ Analytics data fetched successfully")
+    console.log("✅ Real analytics data fetched successfully:", {
+      searches: searchCount,
+      impressions: impressionCount,
+      clicks: clickCount,
+      topKeywords: topKeywords.length,
+      recentActivity: recentActivity.length,
+    })
+
     return NextResponse.json(response)
   } catch (error) {
     console.error("💥 Error in analytics API:", error)

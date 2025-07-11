@@ -17,6 +17,7 @@ import {
   Activity,
   Eye,
   Search,
+  Home,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -67,13 +68,14 @@ export default function AnalyticsDashboard() {
     try {
       setLoading(true)
       setError(null)
-      console.log("🔄 Fetching analytics data...")
+      console.log("🔄 Fetching real analytics data...")
 
       const response = await fetch("/api/analytics", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
+        cache: "no-store", // Always fetch fresh data
       })
 
       if (!response.ok) {
@@ -81,7 +83,7 @@ export default function AnalyticsDashboard() {
       }
 
       const result = await response.json()
-      console.log("📊 Analytics data received:", result)
+      console.log("📊 Real analytics data received:", result)
 
       setData(result)
     } catch (err) {
@@ -94,6 +96,10 @@ export default function AnalyticsDashboard() {
 
   useEffect(() => {
     fetchAnalytics()
+
+    // Auto-refresh every 30 seconds to show real-time data
+    const interval = setInterval(fetchAnalytics, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   const formatDate = (dateString: string) => {
@@ -143,7 +149,7 @@ export default function AnalyticsDashboard() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-          <p className="text-gray-600">Loading analytics...</p>
+          <p className="text-gray-600">Loading real analytics data...</p>
         </div>
       </div>
     )
@@ -193,16 +199,21 @@ export default function AnalyticsDashboard() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
+            <div className="flex items-center mb-2">
+              <Link href="/" className="text-blue-600 hover:text-blue-800 flex items-center text-sm mr-4">
+                <Home className="w-4 h-4 mr-1" />← Back to Chat
+              </Link>
+            </div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center">
               <BarChart3 className="w-8 h-8 mr-3 text-blue-600" />
-              Analytics Dashboard
+              Real-Time Analytics Dashboard
             </h1>
-            <p className="text-gray-600 mt-2">Track your AI chat performance and keyword engagement</p>
+            <p className="text-gray-600 mt-2">Live data from your AI chat performance and keyword engagement</p>
           </div>
           <div className="flex space-x-3">
             <Button onClick={fetchAnalytics} variant="outline">
               <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
+              Refresh Data
             </Button>
             <Link href="/admin">
               <Button variant="outline">
@@ -225,100 +236,110 @@ export default function AnalyticsDashboard() {
             <CardContent>
               <p className="text-orange-700 mb-4">{data.message}</p>
               <p className="text-sm text-orange-600">
-                Run the <code className="bg-orange-100 px-2 py-1 rounded">create-analytics-tables.sql</code> script to
+                Run the <code className="bg-orange-100 px-2 py-1 rounded">complete-analytics-setup.sql</code> script to
                 enable full analytics tracking.
               </p>
             </CardContent>
           </Card>
         )}
 
-        {/* Main Stats */}
+        {/* Real-Time Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <Card>
+          <Card className="border-l-4 border-l-blue-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Chat Questions</CardTitle>
               <MessageSquare className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{data.totals.chat_questions.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-blue-600">{data.totals.chat_questions.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Total AI queries processed</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-green-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Keywords Shown</CardTitle>
               <Eye className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{data.totals.keywords_shown.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-green-600">{data.totals.keywords_shown.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Keyword impressions</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-purple-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Keyword Clicks</CardTitle>
               <MousePointer className="h-4 w-4 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{data.totals.keyword_clicks.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-purple-600">{data.totals.keyword_clicks.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">Total link clicks</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-orange-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Click-Through Rate</CardTitle>
               <TrendingUp className="h-4 w-4 text-orange-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{data.totals.ctr.toFixed(2)}%</div>
+              <div className="text-2xl font-bold text-orange-600">{data.totals.ctr.toFixed(2)}%</div>
               <p className="text-xs text-muted-foreground">Clicks ÷ Impressions</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-green-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${data.totals.revenue.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-green-600">${data.totals.revenue.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">$0.05 per click</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Detailed Analytics */}
+        {/* Real Data Analytics */}
         <Tabs defaultValue="keywords" className="space-y-6">
           <TabsList>
             <TabsTrigger value="keywords">Top Keywords</TabsTrigger>
-            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
+            <TabsTrigger value="activity">Live Activity</TabsTrigger>
             <TabsTrigger value="daily">Daily Stats</TabsTrigger>
+            <TabsTrigger value="tokens">Token Usage</TabsTrigger>
           </TabsList>
 
           <TabsContent value="keywords">
             <Card>
               <CardHeader>
-                <CardTitle>Top Performing Keywords</CardTitle>
-                <CardDescription>Keywords ranked by engagement and revenue</CardDescription>
+                <CardTitle>Top Performing Keywords (Real Data)</CardTitle>
+                <CardDescription>Keywords ranked by actual engagement and revenue</CardDescription>
               </CardHeader>
               <CardContent>
                 {data.topKeywords.length > 0 ? (
                   <div className="space-y-4">
                     {data.topKeywords.map((keyword, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-white">
                         <div className="flex-1">
-                          <h3 className="font-semibold">{keyword.keyword}</h3>
+                          <h3 className="font-semibold text-lg">{keyword.keyword}</h3>
                           <div className="flex space-x-4 text-sm text-gray-600 mt-1">
-                            <span>{keyword.impressions} impressions</span>
-                            <span>{keyword.clicks} clicks</span>
-                            <span>{keyword.ctr.toFixed(2)}% CTR</span>
+                            <span className="flex items-center">
+                              <Eye className="w-3 h-3 mr-1" />
+                              {keyword.impressions} impressions
+                            </span>
+                            <span className="flex items-center">
+                              <MousePointer className="w-3 h-3 mr-1" />
+                              {keyword.clicks} clicks
+                            </span>
+                            <span className="flex items-center">
+                              <TrendingUp className="w-3 h-3 mr-1" />
+                              {keyword.ctr.toFixed(2)}% CTR
+                            </span>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-semibold text-green-600">${keyword.revenue.toFixed(2)}</div>
+                          <div className="font-semibold text-green-600 text-xl">${keyword.revenue.toFixed(2)}</div>
                           <div className="text-sm text-gray-500">revenue</div>
                         </div>
                       </div>
@@ -327,7 +348,7 @@ export default function AnalyticsDashboard() {
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <Eye className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p>No keyword data available yet</p>
+                    <p className="text-lg font-medium">No keyword data yet</p>
                     <p className="text-sm">Keywords will appear here once users interact with your AI responses</p>
                   </div>
                 )}
@@ -338,21 +359,21 @@ export default function AnalyticsDashboard() {
           <TabsContent value="activity">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Live feed of user interactions</CardDescription>
+                <CardTitle>Live Activity Feed (Real Data)</CardTitle>
+                <CardDescription>Real-time feed of actual user interactions</CardDescription>
               </CardHeader>
               <CardContent>
                 {data.recentActivity.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
                     {data.recentActivity.map((activity, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 border rounded-lg">
+                      <div key={index} className="flex items-start space-x-3 p-3 border rounded-lg bg-white">
                         {getActivityIcon(activity.type)}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-1">
                             <Badge className={`text-xs ${getActivityBadgeColor(activity.type)}`}>{activity.type}</Badge>
                             <span className="text-xs text-gray-500">{formatTime(activity.timestamp)}</span>
                           </div>
-                          <p className="text-sm text-gray-800 truncate">{activity.content}</p>
+                          <p className="text-sm text-gray-800">{activity.content}</p>
                           <p className="text-xs text-gray-500">Session: {activity.session}</p>
                         </div>
                       </div>
@@ -361,7 +382,7 @@ export default function AnalyticsDashboard() {
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <Activity className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p>No recent activity</p>
+                    <p className="text-lg font-medium">No recent activity</p>
                     <p className="text-sm">User interactions will appear here in real-time</p>
                   </div>
                 )}
@@ -372,14 +393,14 @@ export default function AnalyticsDashboard() {
           <TabsContent value="daily">
             <Card>
               <CardHeader>
-                <CardTitle>Daily Statistics</CardTitle>
-                <CardDescription>Performance metrics over the last 7 days</CardDescription>
+                <CardTitle>Daily Statistics (Real Data)</CardTitle>
+                <CardDescription>Actual performance metrics over the last 7 days</CardDescription>
               </CardHeader>
               <CardContent>
                 {data.dailyStats.length > 0 ? (
                   <div className="space-y-4">
                     {data.dailyStats.map((day, index) => (
-                      <div key={index} className="grid grid-cols-5 gap-4 p-4 border rounded-lg">
+                      <div key={index} className="grid grid-cols-5 gap-4 p-4 border rounded-lg bg-white">
                         <div>
                           <div className="text-sm font-medium">{formatDate(day.date)}</div>
                         </div>
@@ -405,8 +426,46 @@ export default function AnalyticsDashboard() {
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p>No daily statistics available</p>
+                    <p className="text-lg font-medium">No daily statistics available</p>
                     <p className="text-sm">Daily metrics will appear here once data is collected</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tokens">
+            <Card>
+              <CardHeader>
+                <CardTitle>Token Usage Sessions (Real Data)</CardTitle>
+                <CardDescription>Actual AI token consumption by session</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {data.topTokenSessions.length > 0 ? (
+                  <div className="space-y-4">
+                    {data.topTokenSessions.map((session, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-white">
+                        <div className="flex-1">
+                          <h3 className="font-semibold">Session: {session.session_id}</h3>
+                          <div className="flex space-x-4 text-sm text-gray-600 mt-1">
+                            <span>{session.message_count} messages</span>
+                            <span>Last: {formatTime(session.last_activity)}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-blue-600 text-xl">
+                            {session.total_tokens.toLocaleString()}
+                          </div>
+                          <div className="text-sm text-gray-500">tokens</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">No token usage data</p>
+                    <p className="text-sm">Token usage will appear here once tracking is enabled</p>
                   </div>
                 )}
               </CardContent>
