@@ -1,63 +1,122 @@
 import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
+import XLSX from "xlsx"
 
 export async function POST(request: Request) {
   const supabase = createServerClient()
 
   try {
-    console.log("🔄 Starting bulk keyword upload...")
+    const contentType = request.headers.get("content-type")
 
-    const contentType = request.headers.get("content-type") || ""
+    let keywords: Array<{ keyword: string; target_url: string }> = []
 
-    if (!contentType.includes("multipart/form-data")) {
-      return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 })
-    }
+    if (contentType?.includes("multipart/form-data")) {
+      // Handle file upload
+      const formData = await request.formData()
+      const file = formData.get("file") as File
 
-    const formData = await request.formData()
-    const file = formData.get("file") as File
+      if (!file) {
+        return NextResponse.json({ error: "No file provided" }, { status: 400 })
+      }
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 })
-    }
+      // Validate file type
+      const fileName = file.name.toLowerCase()
+      if (!fileName.endsWith(".csv") && !fileName.endsWith(".xlsx") && !fileName.endsWith(".xls")) {
+        return NextResponse.json({ error: "Invalid file type. Please upload a CSV or Excel file." }, { status: 400 })
+      }
 
-    console.log(`📁 Processing file: ${file.name} (${file.size} bytes)`)
+      // Read file content
+      const fileContent = await file.arrayBuffer()
 
-    // Read file content
-    const text = await file.text()
-    console.log("📝 File content preview:", text.substring(0, 200))
+      if (fileName.endsWith(".csv")) {
+        const text = new TextDecoder().decode(fileContent)
+        console.log("File content preview:", text.substring(0, 200))
 
-    // Parse CSV content
-    const lines = text.split("\n").filter((line) => line.trim())
+        // Parse CSV content
+        const lines = text
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0)
 
-    if (lines.length < 2) {
-      return NextResponse.json({ error: "File must contain at least a header row and one data row" }, { status: 400 })
-    }
+        // Skip header if it exists
+        const dataLines = lines[0]?.toLowerCase().includes("keyword") ? lines.slice(1) : lines
 
-    // Skip header row
-    const dataLines = lines.slice(1)
-    const keywords = []
+        for (const line of dataLines) {
+          if (!line.trim()) continue
 
-    for (const line of dataLines) {
-      if (!line.trim()) continue
+          // Handle CSV parsing with quoted fields
+          const parts = []
+          let current = ""
+          let inQuotes = false
 
-      // Simple CSV parsing - handle quoted fields
-      const parts = line.split(",").map((part) => part.trim().replace(/^"|"$/g, ""))
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i]
+            if (char === '"') {
+              inQuotes = !inQuotes
+            } else if (char === "," && !inQuotes) {
+              parts.push(current.trim())
+              current = ""
+            } else {
+              current += char
+            }
+          }
+          parts.push(current.trim())
 
-      if (parts.length >= 2) {
-        const keyword = parts[0].trim()
-        const target_url = parts[1].trim()
+          if (parts.length >= 2) {
+            const keyword = parts[0].replace(/^"|"$/g, "").trim()
+            const target_url = parts[1].replace(/^"|"$/g, "").trim()
 
-        if (keyword && target_url) {
-          keywords.push({ keyword, target_url })
+            if (keyword && target_url) {
+              // Validate URL
+              try {
+                new URL(target_url)
+                keywords.push({ keyword, target_url })
+              } catch {
+                console.warn(`Invalid URL for keyword "${keyword}": ${target_url}`)
+              }
+            }
+          }
+        }
+      } else {
+        // Parse Excel content
+        const workbook = XLSX.read(fileContent, { type: "array" })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+        // Skip header if it exists
+        const dataLines = jsonData[0]?.map((cell) => cell.toString().toLowerCase()).includes("keyword")
+          ? jsonData.slice(1)
+          : jsonData
+
+        for (const line of dataLines) {
+          if (!line[0] || !line[1]) continue
+
+          const keyword = line[0].toString().trim()
+          const target_url = line[1].toString().trim()
+
+          if (keyword && target_url) {
+            // Validate URL
+            try {
+              new URL(target_url)
+              keywords.push({ keyword, target_url })
+            } catch {
+              console.warn(`Invalid URL for keyword "${keyword}": ${target_url}`)
+            }
+          }
         }
       }
+    } else {
+      // Handle JSON data
+      const body = await request.json()
+      keywords = body.keywords || []
     }
-
-    console.log(`🎯 Parsed ${keywords.length} keywords from file`)
 
     if (keywords.length === 0) {
-      return NextResponse.json({ error: "No valid keywords found in file" }, { status: 400 })
+      return NextResponse.json({ error: "No valid keywords found" }, { status: 400 })
     }
+
+    console.log(`Processing ${keywords.length} keywords...`)
 
     // Get existing keywords to avoid duplicates
     const { data: existingKeywords } = await supabase.from("keywords").select("keyword")
@@ -67,49 +126,38 @@ export async function POST(request: Request) {
     // Filter out duplicates
     const newKeywords = keywords.filter((k) => !existingKeywordSet.has(k.keyword.toLowerCase()))
 
-    console.log(
-      `✅ ${newKeywords.length} new keywords to insert (${keywords.length - newKeywords.length} duplicates skipped)`,
-    )
+    let insertedCount = 0
+    const skippedCount = keywords.length - newKeywords.length
 
-    if (newKeywords.length === 0) {
-      return NextResponse.json({
-        message: "All keywords already exist in database",
-        inserted: 0,
-        skipped: keywords.length,
-      })
-    }
-
-    // Insert new keywords
-    const { data, error } = await supabase
-      .from("keywords")
-      .insert(
-        newKeywords.map((k) => ({
+    if (newKeywords.length > 0) {
+      // Insert new keywords in batches
+      const batchSize = 100
+      for (let i = 0; i < newKeywords.length; i += batchSize) {
+        const batch = newKeywords.slice(i, i + batchSize).map((k) => ({
           keyword: k.keyword,
           target_url: k.target_url,
           active: true,
-        })),
-      )
-      .select()
+        }))
 
-    if (error) {
-      console.error("❌ Database error:", error)
-      return NextResponse.json({ error: "Failed to insert keywords" }, { status: 500 })
+        const { error } = await supabase.from("keywords").insert(batch)
+
+        if (error) {
+          console.error("Batch insert error:", error)
+        } else {
+          insertedCount += batch.length
+        }
+      }
     }
 
-    console.log(`🎉 Successfully inserted ${data?.length || 0} keywords`)
-
     return NextResponse.json({
-      message: `Successfully uploaded ${data?.length || 0} keywords`,
-      inserted: data?.length || 0,
-      skipped: keywords.length - newKeywords.length,
+      success: true,
+      message: `Successfully processed ${keywords.length} keywords. ${insertedCount} inserted, ${skippedCount} skipped (duplicates).`,
+      inserted: insertedCount,
+      skipped: skippedCount,
+      total: keywords.length,
     })
   } catch (error) {
-    console.error("💥 Error in bulk upload:", error)
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Failed to process file",
-      },
-      { status: 500 },
-    )
+    console.error("Error in bulk upload route:", error)
+    return NextResponse.json({ error: "Failed to process bulk upload" }, { status: 500 })
   }
 }

@@ -1,27 +1,13 @@
 "use client"
 
 import React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useChat } from "@ai-sdk/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-  Send,
-  Bot,
-  User,
-  Settings,
-  Paperclip,
-  X,
-  FileText,
-  ImageIcon,
-  AlertCircle,
-  Plus,
-  Wifi,
-  WifiOff,
-  History,
-} from "lucide-react"
+import { Send, Bot, User, AlertCircle, Plus, Wifi, WifiOff, History } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { processMessageWithAds } from "@/lib/ad-processor"
@@ -74,13 +60,10 @@ export default function ChatPage() {
   )
 
   const [processedMessages, setProcessedMessages] = useState<any[]>([])
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-  const [isUploading, setIsUploading] = useState(false)
   const [processingAds, setProcessingAds] = useState(false)
   const [sessionId] = useState(() => Math.random().toString(36).substring(7))
   const [connectionStatus, setConnectionStatus] = useState<"online" | "offline">("online")
   const [currentChatId, setCurrentChatId] = useState<string>("")
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   // Monitor connection status
@@ -172,8 +155,8 @@ export default function ChatPage() {
           session_id: sessionId,
           user_session: sessionId,
           query_text: question,
-          has_files: uploadedFiles.length > 0,
-          file_count: uploadedFiles.length,
+          has_files: false,
+          file_count: 0,
         }),
       })
       console.log("📊 Tracked chat question")
@@ -219,7 +202,6 @@ export default function ChatPage() {
     // Clear all messages and reset the chat
     setMessages([])
     setProcessedMessages([])
-    setUploadedFiles([])
     setInput("")
     setCurrentChatId("")
 
@@ -278,83 +260,11 @@ export default function ChatPage() {
     return () => clearTimeout(timeoutId)
   }, [messages, isLoading, sessionId, toast])
 
-  // Handle file upload
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || [])
-    if (files.length === 0) return
-
-    setIsUploading(true)
-
-    try {
-      const validFiles = files.filter((file) => {
-        const validTypes = [
-          "text/plain",
-          "text/markdown",
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "text/csv",
-          "application/json",
-          "image/jpeg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-        ]
-        const maxSize = 10 * 1024 * 1024 // 10MB
-
-        if (!validTypes.includes(file.type)) {
-          toast({
-            title: "Invalid file type",
-            description: `${file.name} is not a supported file type.`,
-            variant: "destructive",
-          })
-          return false
-        }
-
-        if (file.size > maxSize) {
-          toast({
-            title: "File too large",
-            description: `${file.name} is larger than 10MB.`,
-            variant: "destructive",
-          })
-          return false
-        }
-
-        return true
-      })
-
-      if (validFiles.length > 0) {
-        setUploadedFiles((prev) => [...prev, ...validFiles])
-        toast({
-          title: "Files uploaded",
-          description: `${validFiles.length} file(s) ready to analyze.`,
-        })
-      }
-    } catch (error) {
-      console.error("Error uploading files:", error)
-      toast({
-        title: "Upload failed",
-        description: "Failed to upload files. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUploading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
-    }
-  }
-
-  // Remove uploaded file
-  const removeFile = (index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  // Handle form submission with files
+  // Handle form submission
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!input.trim() && uploadedFiles.length === 0) return
+    if (!input.trim()) return
 
     // Check connection status
     if (connectionStatus === "offline") {
@@ -366,66 +276,17 @@ export default function ChatPage() {
       return
     }
 
-    let messageContent = input
-
     // Track the chat question
     await trackChatQuestion(input)
 
-    // Process uploaded files with size limits for better performance
-    if (uploadedFiles.length > 0) {
-      try {
-        const fileContents = await Promise.all(
-          uploadedFiles.map(async (file) => {
-            if (file.type.startsWith("image/")) {
-              return {
-                name: file.name,
-                type: "image",
-                content: `[Image: ${file.name}]`,
-              }
-            } else {
-              const text = await file.text()
-              // Limit file content to prevent overly long requests
-              const truncatedText =
-                text.length > 50000 ? text.substring(0, 50000) + "\n\n[Content truncated due to length...]" : text
-              return {
-                name: file.name,
-                type: "document",
-                content: truncatedText,
-              }
-            }
-          }),
-        )
-
-        const fileContext = fileContents
-          .map((file) => {
-            if (file.type === "image") {
-              return `**File: ${file.name}**\n${file.content}`
-            }
-            return `**File: ${file.name}**\n\`\`\`\n${file.content}\n\`\`\``
-          })
-          .join("\n\n")
-
-        messageContent = `${input}\n\n**Uploaded Files:**\n${fileContext}`
-      } catch (error) {
-        console.error("Error processing files:", error)
-        toast({
-          title: "Error processing files",
-          description: "Failed to read uploaded files.",
-          variant: "destructive",
-        })
-        return
-      }
-    }
-
-    // Send message with file content
+    // Send message
     await append({
       role: "user",
-      content: messageContent,
+      content: input,
     })
 
-    // Clear the input field and uploaded files after sending
+    // Clear the input field after sending
     setInput("")
-    setUploadedFiles([])
   }
 
   // Enhanced function to format message content with modern typography
@@ -552,13 +413,6 @@ export default function ChatPage() {
     return formatted
   }
 
-  const getFileIcon = (file: File) => {
-    if (file.type.startsWith("image/")) {
-      return <ImageIcon className="w-4 h-4" />
-    }
-    return <FileText className="w-4 h-4" />
-  }
-
   return (
     <div className="flex flex-col h-screen bg-white">
       {/* Header - Updated with new logo */}
@@ -598,12 +452,6 @@ export default function ChatPage() {
               <Plus className="w-4 h-4 mr-2" />
               New Chat
             </Button>
-            <Link href="/admin">
-              <Button variant="outline" size="sm">
-                <Settings className="w-4 h-4 mr-2" />
-                Admin
-              </Button>
-            </Link>
           </div>
         </div>
       </header>
@@ -631,7 +479,7 @@ export default function ChatPage() {
 
       {/* Chat Messages */}
       <ScrollArea className="flex-1">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
           {processedMessages.length === 0 && (
             <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
               <div className="w-20 h-20 mb-6 flex items-center justify-center">
@@ -655,7 +503,7 @@ export default function ChatPage() {
                 message.role === "user" ? "bg-gray-50/50" : "bg-white"
               } border-b border-gray-100 last:border-b-0`}
             >
-              <div className="max-w-4xl mx-auto px-6 py-8">
+              <div className="py-6 sm:py-8">
                 <div className="flex items-start space-x-4">
                   <Avatar className="w-9 h-9 flex-shrink-0">
                     <AvatarFallback
@@ -688,7 +536,7 @@ export default function ChatPage() {
 
           {isLoading && (
             <div className="w-full bg-white border-b border-gray-100">
-              <div className="max-w-4xl mx-auto px-6 py-8">
+              <div className="py-6 sm:py-8">
                 <div className="flex items-start space-x-4">
                   <Avatar className="w-9 h-9 flex-shrink-0">
                     <AvatarFallback className="bg-blue-500 text-white">
@@ -721,39 +569,14 @@ export default function ChatPage() {
       {/* Input Form - Bottom Center */}
       <div className="border-t bg-white p-4 mb-4">
         <div className="max-w-4xl mx-auto">
-          {/* Uploaded Files Display */}
-          {uploadedFiles.length > 0 && (
-            <div className="mb-3 p-3 bg-gray-50 rounded-lg border">
-              <div className="text-sm text-gray-600 mb-2">Uploaded files ({uploadedFiles.length}):</div>
-              <div className="flex flex-wrap gap-2">
-                {uploadedFiles.map((file, index) => (
-                  <div key={index} className="flex items-center space-x-2 bg-white px-3 py-1 rounded-md border">
-                    {getFileIcon(file)}
-                    <span className="text-sm text-gray-700 truncate max-w-[200px]">{file.name}</span>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <form onSubmit={handleFormSubmit} className="flex items-end space-x-3">
             <div className="flex-1 relative">
               <Input
                 value={input}
                 onChange={handleInputChange}
-                placeholder={
-                  connectionStatus === "offline"
-                    ? "No internet connection..."
-                    : "Ask YawlAI anything... (or upload files)"
-                }
+                placeholder={connectionStatus === "offline" ? "No internet connection..." : "Ask YawlAI anything..."}
                 disabled={isLoading || connectionStatus === "offline"}
-                className="pr-12 py-3 text-base resize-none min-h-[48px] bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="py-3 text-base resize-none min-h-[48px] bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
@@ -761,28 +584,10 @@ export default function ChatPage() {
                   }
                 }}
               />
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".txt,.md,.pdf,.doc,.docx,.csv,.json,.jpg,.jpeg,.png,.gif,.webp"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <Button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading || isLoading}
-                variant="ghost"
-                size="sm"
-                className="absolute right-12 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <Paperclip className="w-4 h-4" />
-              </Button>
             </div>
             <Button
               type="submit"
-              disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading || connectionStatus === "offline"}
+              disabled={!input.trim() || isLoading || connectionStatus === "offline"}
               className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Send className="w-4 h-4" />
@@ -794,6 +599,24 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="bg-gray-100 border-t border-gray-200 py-6">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="text-center space-y-4">
+            <div className="flex flex-wrap justify-center items-center gap-6 text-sm text-gray-600">
+              <span>© 2024 YawlAI</span>
+              <span>•</span>
+              <span>Set Sail with YawlAI, Your Free AI Assistant</span>
+            </div>
+            <div className="flex justify-center">
+              <Link href="/admin" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
+                Admin
+              </Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

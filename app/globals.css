@@ -170,3 +170,49 @@ html {
 .focus-within\:shadow-md:focus-within {
   @apply shadow-md transition-shadow duration-200;
 }
+
+/* Mobile optimizations - subtle improvements */
+@media (max-width: 768px) {
+  .max-w-4xl {
+    @apply px-3;
+  }
+
+  /* Ensure proper touch targets on mobile */
+  button,
+  input {
+    min-height: 44px;
+  }
+
+  /* Prevent zoom on input focus on iOS */
+  input[type="text"] {
+    font-size: 16px;
+  }
+
+  /* Better mobile scrolling */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 640px) {
+  .prose-custom h1 {
+    @apply text-xl mt-6 mb-4;
+  }
+
+  .prose-custom h2 {
+    @apply text-lg mt-6 mb-3;
+  }
+
+  .prose-custom h3 {
+    @apply text-base mt-4 mb-2;
+  }
+
+  .prose-custom pre {
+    @apply p-3 text-xs;
+  }
+
+  .prose-custom code {
+    @apply text-xs px-1.5 py-0.5;
+  }
+}

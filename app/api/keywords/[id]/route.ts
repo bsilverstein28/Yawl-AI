@@ -1,39 +1,81 @@
 import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const supabase = createServerClient()
+
+  try {
+    const { data: keyword, error } = await supabase.from("keywords").select("*").eq("id", params.id).single()
+
+    if (error) {
+      console.error("Error fetching keyword:", error)
+      return NextResponse.json({ error: "Keyword not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({ keyword })
+  } catch (error) {
+    console.error("Error in keyword GET route:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   const supabase = createServerClient()
 
   try {
-    const { keyword, target_url, active } = await request.json()
-    const id = params.id
+    const body = await request.json()
+    const { keyword, target_url, active } = body
 
-    if (!id) {
-      return NextResponse.json({ error: "ID is required" }, { status: 400 })
+    // Validate required fields
+    if (!keyword || !target_url) {
+      return NextResponse.json({ error: "Keyword and target URL are required" }, { status: 400 })
     }
 
-    const updateData: any = { updated_at: new Date().toISOString() }
+    // Validate URL format
+    try {
+      new URL(target_url)
+    } catch {
+      return NextResponse.json({ error: "Invalid URL format" }, { status: 400 })
+    }
 
-    if (keyword !== undefined) updateData.keyword = keyword.trim()
-    if (target_url !== undefined) updateData.target_url = target_url.trim()
-    if (active !== undefined) updateData.active = active
+    // Check for duplicate keywords (excluding current one)
+    const { data: existingKeyword } = await supabase
+      .from("keywords")
+      .select("id")
+      .eq("keyword", keyword.trim())
+      .neq("id", params.id)
+      .single()
 
+    if (existingKeyword) {
+      return NextResponse.json({ error: "Keyword already exists" }, { status: 409 })
+    }
+
+    // Update keyword
     const { data, error } = await supabase
       .from("keywords")
-      .update(updateData)
-      .eq("id", Number.parseInt(id))
+      .update({
+        keyword: keyword.trim(),
+        target_url: target_url.trim(),
+        active: Boolean(active),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", params.id)
       .select()
       .single()
 
     if (error) {
-      console.error("Database error:", error)
+      console.error("Error updating keyword:", error)
       return NextResponse.json({ error: "Failed to update keyword" }, { status: 500 })
     }
 
-    return NextResponse.json(data)
+    if (!data) {
+      return NextResponse.json({ error: "Keyword not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({ keyword: data })
   } catch (error) {
-    console.error("Error updating keyword:", error)
-    return NextResponse.json({ error: "Failed to update keyword" }, { status: 500 })
+    console.error("Error in keyword PUT route:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
@@ -41,22 +83,17 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   const supabase = createServerClient()
 
   try {
-    const id = params.id
-
-    if (!id) {
-      return NextResponse.json({ error: "ID is required" }, { status: 400 })
-    }
-
-    const { error } = await supabase.from("keywords").delete().eq("id", Number.parseInt(id))
+    // Delete keyword
+    const { error } = await supabase.from("keywords").delete().eq("id", params.id)
 
     if (error) {
-      console.error("Database error:", error)
+      console.error("Error deleting keyword:", error)
       return NextResponse.json({ error: "Failed to delete keyword" }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error deleting keyword:", error)
-    return NextResponse.json({ error: "Failed to delete keyword" }, { status: 500 })
+    console.error("Error in keyword DELETE route:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
